@@ -180,7 +180,7 @@ export default function App() {
         <div className="brand-wrap">
           <h1 className="brand">
             <button className="brand-btn" onClick={() => { setTopic(null); setTrail([]); setPanel(null); setSelected(null) }}>
-              Curiosidad<span className="dot">.</span>
+              Curiosity<span className="dot">.</span>
             </button>
           </h1>
           <button className="howto" onClick={() => setAbout(true)}>
