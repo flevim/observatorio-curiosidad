@@ -2,11 +2,11 @@
 // lo alto es claro. Pasos cuantizados para que la leyenda sea legible y los colores comparables en el tiempo.
 import type { GlobeData } from '../api'
 
-// Segundo color de la identidad (el primero, naranja, es para acciones): cian, de oscuro a claro.
+// Segundo color de la identidad (el primero, rosado, es para acciones): cian, de oscuro a claro.
 export const RAMP = ['#0d4250', '#13627a', '#1c84a0', '#3aa6c2', '#7cc9db', '#c6ecf3']
 export const NO_DATA = 'rgba(0,0,0,0)' // sin datos: se ve la Tierra, sin color encima
-export const ABSENT = 'rgba(236,232,224,0.16)' // hay ranking, pero el tema no aparece
-export const SELECTED_STROKE = '#f0601a'
+export const ABSENT = 'rgba(236,235,243,0.16)' // hay ranking, pero el tema no aparece
+export const SELECTED_STROKE = '#f2559a'
 
 /** Color sobre el globo: el mismo paso de la rampa, con algo de transparencia para que se vea el relieve. */
 const withAlpha = (hex: string, a: number) => {

@@ -25,7 +25,7 @@ Documentación consultada en noviembre de 2026: https://doc.wikimedia.org/genera
 ## Software
 
 React, react-dom (MIT) · globe.gl, three.js (MIT) · d3-geo (ISC) · Vite (MIT) · TypeScript (Apache-2.0) ·
-Tipografías Instrument Sans, Instrument Serif y Martian Mono (SIL Open Font License, vía Fontsource) ·
+Tipografías Space Grotesk, Fraunces e IBM Plex Mono (SIL Open Font License, vía Fontsource) ·
 FastAPI, uvicorn, httpx (BSD-3) · pandas, NumPy, SciPy (BSD-3) · PyArrow (Apache-2.0) · PyYAML (MIT) · pytest (MIT).
 
 ## Limitaciones (también en la app, en «Acerca de los datos»)

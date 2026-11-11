@@ -22,7 +22,7 @@ type Props = {
 type GlobeInstance = InstanceType<typeof Globe>
 
 const IDLE_RESUME_MS = 8000
-const STROKE = 'rgba(236,232,224,0.32)'
+const STROKE = 'rgba(236,235,243,0.32)'
 
 export default function GlobeView({ geo, stateFor, describe, selected, onSelect, reducedMotion, rotate, highlights = [], colorKey }: Props) {
   const host = useRef<HTMLDivElement>(null)
@@ -56,10 +56,10 @@ export default function GlobeView({ geo, stateFor, describe, selected, onSelect,
       .showGraticules(false)
       .polygonsData(geo.features)
       .polygonAltitude(0.006)
-      .polygonSideColor(() => 'rgba(236,232,224,0.05)')
+      .polygonSideColor(() => 'rgba(236,235,243,0.05)')
       .polygonStrokeColor(() => STROKE)
       .pointsData([])
-      .pointColor(() => '#f0601a')
+      .pointColor(() => '#f2559a')
       .pointAltitude(0.035)
       .pointRadius(0.55)
       .pointsMerge(false)

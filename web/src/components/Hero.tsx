@@ -36,11 +36,11 @@ export default function Hero({ meta, onTopic, onCountry }: Props) {
         que se encontró ahí.
       </p>
 
-      <p className="step">01 / Tema</p>
+      <p className="step">A — Tema</p>
       <SearchBox topics={meta.temas} onPick={onTopic} big />
 
       <p className="step step-row">
-        <span>02 / O prueba</span>
+        <span>B — O prueba</span>
         <span className="step-hint">o toca un país en el globo</span>
       </p>
       <div className="chips-row">
@@ -50,7 +50,7 @@ export default function Hero({ meta, onTopic, onCountry }: Props) {
         <button className="chip accent" onClick={surprise}>Sorpréndeme</button>
       </div>
 
-      <p className="step">03 / {last ? 'Lo curioso, día a día' : 'Hallazgos'}</p>
+      <p className="step">C — {last ? 'Lo curioso, día a día' : 'Hallazgos'}</p>
       <Findings onTopic={onTopic} onCountry={onCountry} reportAvailable={meta.reporte_disponible} />
     </section>
   )

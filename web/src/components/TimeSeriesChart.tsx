@@ -3,8 +3,8 @@ import type { SeriesPayload } from '../api'
 import { compact, lang, num } from '../lib/format'
 
 // Colores categóricos fijos por idioma resaltado (paleta validada, variante oscura); el resto en gris de contexto.
-export const HL_COLORS = ['#2a9db6', '#f0601a', '#9a72e0'] // validados para daltonismo sobre #07080a
-const CTX = 'rgba(236,232,224,0.18)'
+export const HL_COLORS = ['#2a9db6', '#c08a1a', '#dd3f86'] // es, en, comparación: validados para daltonismo sobre #08070c
+const CTX = 'rgba(236,235,243,0.18)'
 
 type Props = {
   data: SeriesPayload
