@@ -1,0 +1,42 @@
+# Temas del Observatorio de la Curiosidad.
+#
+# Cada tema necesita:
+#   id:     identificador corto (minúsculas, sin espacios). No lo cambies después de descargar datos.
+#   nombre: cómo se muestra en español.
+#   semilla: artículo de partida en una edición concreta. El pipeline obtiene el elemento de
+#            Wikidata de ese artículo (siguiendo redirecciones) y desde ahí el título exacto en
+#            cada idioma. Nunca se adivinan títulos.
+#   wikidata: (opcional) fija el elemento de Wikidata y omite la semilla.
+#   openalex: (opcional, futuro) id de un topic/concept de OpenAlex. Ver docs/openalex.md.
+#
+# Agregar un tema: añade una entrada y ejecuta
+#   python -m observatorio fetch --topics <id> && python -m observatorio analyze && python -m observatorio export
+# o usa el botón "Agregar tema" de la aplicación web (hace lo mismo a través de la API).
+
+idiomas: [es, en, pt, fr, de, ja, it, ru, zh, ar]
+
+temas:
+  - {id: inteligencia-artificial, nombre: Inteligencia artificial, semilla: {idioma: en, titulo: Artificial intelligence}}
+  - {id: crispr, nombre: CRISPR, semilla: {idioma: en, titulo: CRISPR}}
+  - {id: microplastico, nombre: Microplástico, semilla: {idioma: en, titulo: Microplastics}}
+  - {id: semaglutida, nombre: Semaglutida, semilla: {idioma: en, titulo: Semaglutide}}
+  # Q176555 (computadora cuántica): el elemento «computación cuántica» no tiene artículo en ruso y en
+  # de/ja/it/zh redirige igual al artículo de «computador cuántico». Este cubre los 10 idiomas.
+  - {id: computacion-cuantica, nombre: Computación cuántica, wikidata: Q176555}
+  - {id: litio, nombre: Litio, semilla: {idioma: en, titulo: Lithium}}
+  - {id: agujero-negro, nombre: Agujero negro, semilla: {idioma: en, titulo: Black hole}}
+  - {id: estoicismo, nombre: Estoicismo, semilla: {idioma: en, titulo: Stoicism}}
+  - {id: ajedrez, nombre: Ajedrez, semilla: {idioma: en, titulo: Chess}}
+  - {id: sismo, nombre: Sismo, semilla: {idioma: en, titulo: Earthquake}}
+  # Sin artículo en ruso para este elemento (ru.wikipedia lo trata dentro de «Глобальное потепление», otro elemento),
+  # y en español el enlace lleva a «Calentamiento global». Se mantiene: cambiarlo mezclaría conceptos en de/it/ja.
+  - {id: cambio-climatico, nombre: Cambio climático, semilla: {idioma: en, titulo: Climate change}}
+  - {id: vacuna-arnm, nombre: Vacuna de ARNm, semilla: {idioma: en, titulo: MRNA vaccine}}
+  - {id: fusion-nuclear, nombre: Fusión nuclear, semilla: {idioma: en, titulo: Nuclear fusion}}
+  - {id: taylor-swift, nombre: Taylor Swift, semilla: {idioma: en, titulo: Taylor Swift}}
+  - {id: inflacion, nombre: Inflación, semilla: {idioma: en, titulo: Inflation}}
+  - {id: dopamina, nombre: Dopamina, semilla: {idioma: en, titulo: Dopamine}}
+  - {id: meditacion, nombre: Meditación, semilla: {idioma: en, titulo: Meditation}}
+  - {id: telescopio-james-webb, nombre: Telescopio James Webb, semilla: {idioma: en, titulo: James Webb Space Telescope}}
+  - {id: bitcoin, nombre: Bitcoin, semilla: {idioma: en, titulo: Bitcoin}}
+  - {id: futbol, nombre: Fútbol, semilla: {idioma: en, titulo: Association football}}

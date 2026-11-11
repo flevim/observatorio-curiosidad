@@ -1,0 +1,36 @@
+# Uso:
+#   1. Copia .env.example a .env y completa OBSERVATORIO_CONTACT (lo exige Wikimedia).
+#   2. docker compose up -d --build
+#   3. Abre http://localhost:8010
+#
+# data/, config/ y reports/ son carpetas del proyecto montadas en los contenedores: los datos ya descargados
+# se reutilizan y sobreviven a reconstrucciones. Sin datos, la primera vez ejecuta:
+#   docker compose run --rm actualizador python -m observatorio all
+
+services:
+  web:
+    build: .
+    image: observatorio-curiosidad:0.1.0
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "${OBSERVATORIO_API_PORT:-8010}:8010"
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config
+      - ./reports:/app/reports
+
+  # Actualización diaria: descarga lo nuevo, recalcula y genera las curiosidades del día.
+  actualizador:
+    image: observatorio-curiosidad:0.1.0
+    depends_on:
+      - web
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      OBSERVATORIO_HORA_DIARIA: "${OBSERVATORIO_HORA_DIARIA:-09:00}"
+    command: ["python", "scripts/programador.py"]
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config
+      - ./reports:/app/reports

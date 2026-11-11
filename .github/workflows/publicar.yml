@@ -1,0 +1,102 @@
+# Actualiza los datos de Wikimedia cada día y publica el sitio estático en GitHub Pages.
+#
+# Requisitos (una sola vez, en GitHub):
+#   1. Settings → Secrets and variables → Actions → New repository secret:
+#        OBSERVATORIO_CONTACT = un correo o URL de contacto (lo exige la política de Wikimedia).
+#   2. Settings → Pages → Build and deployment → Source: «GitHub Actions».
+#
+# La primera ejecución descarga todo (~1 h, por los rankings por país). Después, la caché de Actions guarda
+# data/ y cada actualización diaria tarda unos minutos.
+
+name: Actualizar y publicar
+
+on:
+  schedule:
+    - cron: "0 13 * * *"   # todos los días, 13:00 UTC (10:00 en Chile continental)
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  construir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      OBSERVATORIO_ROOT: ${{ github.workspace }}
+      OBSERVATORIO_CONTACT: ${{ secrets.OBSERVATORIO_CONTACT }}
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Recuperar datos descargados (caché de Actions)
+        uses: actions/cache/restore@v4
+        with:
+          path: data
+          key: datos-${{ github.run_id }}
+          restore-keys: datos-
+
+      - name: Instalar el pipeline
+        run: pip install -r requirements.txt ./pipeline
+
+      - name: Pruebas
+        run: python -m pytest -q
+
+      - name: Actualizar datos, análisis, reporte y curiosidades
+        shell: bash   # bash -eo pipefail: si Python falla, el paso falla aunque haya un grep en la tubería
+        run: |
+          python -m observatorio daily | grep -vE '^(visitas|rankings): '
+
+      - name: Guardar datos para la próxima ejecución
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: data
+          key: datos-${{ github.run_id }}
+
+      - name: Compilar la web en modo estático
+        working-directory: web
+        env:
+          VITE_STATIC: "1"
+          VITE_BASE: /${{ github.event.repository.name }}/
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
+      - name: Armar el sitio
+        run: python -m observatorio site --out site
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  publicar:
+    needs: construir
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

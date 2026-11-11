@@ -1,0 +1,22 @@
+# Países para los rankings "top-per-country" de Wikimedia.
+#
+# La API solo ofrece rankings DIARIOS (no mensuales) y desde 2021-01-01. Wikimedia pide no hacer
+# peticiones en paralelo, así que descargar todos los días de todos los países sería ~200.000
+# llamadas. Por eso se muestrean días: el ranking "mensual" de la app es la suma de los días
+# muestreados (aproximado) y se indica así en la interfaz.
+#
+# Para cubrir más países o más días, edita estas listas y vuelve a ejecutar `fetch --countries-only`.
+# Las respuestas ya descargadas se reutilizan desde la caché.
+
+inicio: "2021-01-01"
+dias_muestreados_por_mes: [8, 22]
+dias_recientes_completos: 14     # además, todos los días de las últimas N jornadas
+
+# Códigos ISO 3166-1 alfa-2. Ojo: "NO" (Noruega) va entre comillas porque YAML lo lee como «falso».
+paises: [
+  US, GB, CA, AU, IE, NZ, IN, PK, BD, NG, ZA, KE, EG, MA, DZ,
+  ES, MX, AR, CO, CL, PE, VE, EC, UY, BO, PY, CR, GT, DO, CU,
+  BR, PT, FR, BE, CH, DE, AT, NL, SE, "NO", DK, FI, PL, CZ, IT,
+  GR, TR, UA, RU, RO, HU, IL, SA, AE, IR, JP, KR, TW, HK, CN,
+  ID, PH, VN, TH, MY, SG
+]

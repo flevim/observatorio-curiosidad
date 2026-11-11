@@ -1,0 +1,14 @@
+# Solo el código entra en la imagen; los datos se montan como volumen.
+.venv/
+.env
+.git/
+.pytest_cache/
+**/__pycache__/
+**/*.pyc
+**/*.egg-info/
+data/
+reports/
+web/node_modules/
+web/dist/
+tests/
+scripts/*.ps1

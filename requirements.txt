@@ -1,0 +1,12 @@
+# Dependencias fijadas (Python 3.12+). Instalar con: pip install -r requirements.txt
+httpx==0.28.1
+pandas==3.1.1
+numpy==2.5.4
+scipy==1.18.1
+pyarrow==26.0.1
+pyyaml==6.0.3
+fastapi==0.162.4
+uvicorn==0.54.0
+pytest==9.2.0
+respx==0.23.1
+tzdata==2026.6
