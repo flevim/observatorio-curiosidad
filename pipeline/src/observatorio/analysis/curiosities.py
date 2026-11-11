@@ -166,6 +166,7 @@ def daily_curiosities(tops: pd.DataFrame, resolved: dict, names: dict[str, str],
         ["n", "visitas"], ascending=False)
     for (p, a), r in nuevos[nuevos["n"] >= 2].head(4).iterrows():
         items.append({
+            "_peso": 3e9 + r.n * 1e6 + min(r.visitas, 999999),
             "tipo": "varios_paises",
             "texto": f"«{a.replace('_', ' ')}» ({edicion(p)}) entró en el ranking de {r.n} países a la vez "
                      f"({', '.join(cn(c) for c in r.paises[:6])}{'…' if r.n > 6 else ''}) sin haber aparecido en los {prev_days} días anteriores observados.",
@@ -183,6 +184,7 @@ def daily_curiosities(tops: pd.DataFrame, resolved: dict, names: dict[str, str],
                             index=local.index, dtype=bool)]
     for r in local.sort_values("views_ceil", ascending=False).drop_duplicates("country").head(6).itertuples():
         items.append({
+            "_peso": 2e9 + (10 - int(r.rank)) * 1e6 + min(r.views_ceil, 999999),
             "tipo": "local",
             "texto": f"En {cn(r.country)}, «{r.article.replace('_', ' ')}» subió al puesto {r.rank} (≈ {num(r.views_ceil)} visitas) "
                      f"sin aparecer en ningún otro país ni en los días anteriores.",
@@ -195,6 +197,7 @@ def daily_curiosities(tops: pd.DataFrame, resolved: dict, names: dict[str, str],
     for t, gt in t_today.groupby("tema"):
         best = gt.sort_values("rank").iloc[0]
         items.append({
+            "_peso": 1e9,
             "tipo": "tema",
             "texto": f"«{names.get(t, t)}» está en el ranking de {gt['country'].nunique()} {'país' if gt['country'].nunique() == 1 else 'países'}: mejor puesto {int(best['rank'])} en {cn(best['country'])}.",
             "tema": t,
@@ -209,6 +212,7 @@ def daily_curiosities(tops: pd.DataFrame, resolved: dict, names: dict[str, str],
             if day - pd.Timedelta(days=2) <= d <= day:
                 lg, title = pk["idioma"], pk["titulo"]
                 items.append({
+                    "_peso": 1.5e9 + min(pk["magnitud"], 999) * 1e3,
                     "tipo": "pico",
                     "texto": f"Pico de atención en «{names.get(t, t)}» ({edicion(lg + '.wikipedia')}): {num(pk['visitas'])} visitas el "
                              f"{fecha_corta(d)}, {num(pk['magnitud'], 1)} veces su nivel habitual.",
@@ -216,6 +220,11 @@ def daily_curiosities(tops: pd.DataFrame, resolved: dict, names: dict[str, str],
                     "enlaces": [link(f"{lg}.wikipedia", title.replace(" ", "_"))],
                 })
 
+    # Lo más llamativo primero: varios países, picos, novedades locales (mejor puesto y más visitas) y temas.
+    # Como máximo 4 novedades locales, para que no se repita la misma plantilla una y otra vez.
+    items.sort(key=lambda c: -c.pop("_peso"))
+    locales = [c for c in items if c["tipo"] == "local"][:4]
+    items = [c for c in items if c["tipo"] != "local"] + locales
     return {
         "fecha": day.strftime("%Y-%m-%d"),
         "paises": int(today["country"].nunique()),
