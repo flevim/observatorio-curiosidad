@@ -10,6 +10,7 @@
 | MediaWiki Action API (`action=query`) | Redirecciones, enlaces entre artículos, categorías | Metadatos. Los textos de Wikipedia son CC BY-SA, pero aquí no se reutilizan |
 | Wikidata API (`wbgetentities`) | Títulos equivalentes entre idiomas (sitelinks), etiquetas, relaciones | CC0 |
 | Natural Earth 1:110m y 1:50m, países (v5.1.2) | Geometría del globo y del mapa | Dominio público |
+| NASA Blue Marble (vía el paquete three-globe) | Textura y relieve de la Tierra en el globo | Dominio público (NASA) |
 
 Documentación consultada en noviembre de 2026: https://doc.wikimedia.org/generated-data-platform/aqs/analytics-api/
 
@@ -24,6 +25,7 @@ Documentación consultada en noviembre de 2026: https://doc.wikimedia.org/genera
 ## Software
 
 React, react-dom (MIT) · globe.gl, three.js (MIT) · d3-geo (ISC) · Vite (MIT) · TypeScript (Apache-2.0) ·
+Tipografías Instrument Sans, Instrument Serif y Martian Mono (SIL Open Font License, vía Fontsource) ·
 FastAPI, uvicorn, httpx (BSD-3) · pandas, NumPy, SciPy (BSD-3) · PyArrow (Apache-2.0) · PyYAML (MIT) · pytest (MIT).
 
 ## Limitaciones (también en la app, en «Acerca de los datos»)
