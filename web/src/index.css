@@ -20,7 +20,6 @@
   --font-sans: 'Space Grotesk Variable', 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   --font-serif: 'Fraunces Variable', 'Fraunces', Georgia, serif;
-  --font-display: 'Bricolage Grotesque Variable', 'Bricolage Grotesque', var(--font-sans);
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
@@ -95,7 +94,7 @@ code { font-family: var(--font-mono); font-size: 0.85em; }
 
 .topbar { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; padding: 16px 22px 8px; z-index: 5; }
 .brand-wrap { display: flex; flex-direction: column; gap: 2px; margin-right: auto; }
-.brand { margin: 0; font: 700 1.5rem/1 var(--font-display); letter-spacing: -0.03em; }
+.brand { margin: 0; font: italic 500 1.6rem/1 var(--font-serif); letter-spacing: -0.02em; }
 .brand-btn { background: none; border: 0; padding: 0; cursor: pointer; color: var(--ink); font: inherit; }
 .brand .dot { color: var(--accent); }
 .howto { background: none; border: 0; padding: 0; color: var(--ink-2); cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
@@ -131,8 +130,8 @@ code { font-family: var(--font-mono); font-size: 0.85em; }
   scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }
 .kicker { display: flex; align-items: center; gap: 12px; color: var(--ink-2); margin: 18px 0 18px; }
 .kicker .rule { width: 8px; height: 8px; background: var(--accent); }
-.hero-title { margin: 0; font: 700 clamp(2.3rem, 4.2vw, 3.9rem)/1 var(--font-display); font-variation-settings: 'wdth' 88; letter-spacing: -0.03em; text-wrap: balance; }
-.hero-title em { font-family: var(--font-display); font-style: normal; font-weight: 700; color: var(--accent); }
+.hero-title { margin: 0; font: 500 clamp(2.4rem, 4.4vw, 4rem)/1.02 var(--font-serif); letter-spacing: -0.025em; text-wrap: balance; }
+.hero-title em { font-family: var(--font-serif); font-style: italic; font-weight: 400; color: var(--accent); }
 .hero-lede { color: var(--ink-2); margin: 18px 0 26px; max-width: 38ch; }
 .step { color: var(--ink-2); margin: 22px 0 10px; }
 .step-row { display: flex; justify-content: space-between; gap: 12px; }
