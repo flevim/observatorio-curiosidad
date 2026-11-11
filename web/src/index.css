@@ -94,7 +94,7 @@ code { font-family: var(--font-mono); font-size: 0.85em; }
 
 .topbar { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; padding: 16px 22px 8px; z-index: 5; }
 .brand-wrap { display: flex; flex-direction: column; gap: 2px; margin-right: auto; }
-.brand { margin: 0; font: italic 500 1.6rem/1 var(--font-serif); letter-spacing: -0.02em; }
+.brand { margin: 0; font: 500 1.6rem/1 var(--font-serif); letter-spacing: -0.02em; }
 .brand-btn { background: none; border: 0; padding: 0; cursor: pointer; color: var(--ink); font: inherit; }
 .brand .dot { color: var(--accent); }
 .howto { background: none; border: 0; padding: 0; color: var(--ink-2); cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
