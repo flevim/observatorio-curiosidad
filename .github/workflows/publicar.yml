@@ -64,7 +64,7 @@ jobs:
         run: python -m pytest -q
 
       - name: Actualizar datos, análisis, reporte y curiosidades
-        shell: bash   # bash -eo pipefail: si Python falla, el paso falla aunque haya un grep en la tubería
+        shell: bash -eo pipefail {0}   # si Python falla, el paso falla aunque haya un grep en la tubería
         run: |
           python -m observatorio daily | grep -vE '^(visitas|rankings): '
 
