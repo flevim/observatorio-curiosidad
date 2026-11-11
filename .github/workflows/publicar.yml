@@ -34,6 +34,8 @@ jobs:
       OBSERVATORIO_ROOT: ${{ github.workspace }}
       OBSERVATORIO_CONTACT: ${{ secrets.OBSERVATORIO_CONTACT }}
       PYTHONIOENCODING: utf-8
+      # Un poco más lento que el valor local: los runners de GitHub comparten IP y Wikimedia limita por IP (429).
+      OBSERVATORIO_MIN_INTERVAL: "0.5"
     steps:
       - uses: actions/checkout@v4
 
@@ -67,7 +69,8 @@ jobs:
           python -m observatorio daily | grep -vE '^(visitas|rankings): '
 
       - name: Guardar datos para la próxima ejecución
-        if: success()
+        # Guardar también si falla (p. ej. por 429): así no se pierde lo ya descargado.
+        if: always()
         uses: actions/cache/save@v4
         with:
           path: data
