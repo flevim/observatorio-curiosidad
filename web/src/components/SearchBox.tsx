@@ -1,11 +1,25 @@
-import { useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { TopicSummary } from '../api'
 import { fold } from '../lib/format'
 
-type Props = { topics: TopicSummary[]; onPick: (id: string) => void }
+type Props = { topics: TopicSummary[]; onPick: (id: string) => void; big?: boolean }
 
 /** Combobox accesible (patrón ARIA 1.2) con autocompletado sin tildes. Filtra en el cliente: la lista ya está en meta. */
-export default function SearchBox({ topics, onPick }: Props) {
+export default function SearchBox({ topics, onPick, big }: Props) {
+  const input = useRef<HTMLInputElement>(null)
+  // Atajo «/» para enfocar el buscador (como en muchos sitios de búsqueda), salvo si ya se escribe en un campo.
+  useEffect(() => {
+    if (!big) return
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement
+      if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName) && !t.isContentEditable) {
+        e.preventDefault()
+        input.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [big])
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
@@ -30,12 +44,17 @@ export default function SearchBox({ topics, onPick }: Props) {
   }
 
   return (
-    <div className="search">
+    <div className={`search${big ? ' search-big' : ''}`}>
+      <svg className="search-icon" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+        <circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" strokeWidth="1.4" />
+        <path d="M11 11l4 4" stroke="currentColor" strokeWidth="1.4" />
+      </svg>
       <label htmlFor={`${id}-in`} className="sr-only">Buscar tema</label>
       <input
         id={`${id}-in`}
         type="search"
-        placeholder="Buscar tema…"
+        ref={input}
+        placeholder={big ? 'Buscar un tema' : 'Buscar tema…'}
         role="combobox"
         aria-expanded={open && results.length > 0}
         aria-controls={`${id}-list`}
@@ -66,6 +85,7 @@ export default function SearchBox({ topics, onPick }: Props) {
           }
         }}
       />
+      {big && <kbd className="kbd" aria-hidden="true">/</kbd>}
       {open && results.length > 0 && (
         <ul id={`${id}-list`} role="listbox" className="search-list">
           {results.map((t, i) => (

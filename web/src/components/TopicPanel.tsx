@@ -84,7 +84,7 @@ export default function TopicPanel({ topicId, graph, periodLabel, onNavigate, on
           {highlight.map((l, i) => (
             <span key={l}><i className="sw" style={{ background: HL_COLORS[i] }} />{lang(l)}</span>
           ))}
-          <span><i className="sw" style={{ background: '#4a4a46' }} />otros idiomas</span>
+          <span><i className="sw" style={{ background: 'rgba(236,232,224,0.18)' }} />otros idiomas</span>
         </div>
         {payload ? (
           <TimeSeriesChart

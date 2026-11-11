@@ -4,7 +4,7 @@ import { MeshPhongMaterial, Color } from 'three'
 import { geoCentroid } from 'd3-geo'
 import type { CountryFeature, GeoJSON } from '../api'
 import { api } from '../api'
-import { SELECTED_STROKE, type CountryState, stateColor } from '../lib/scale'
+import { SELECTED_STROKE, type CountryState, globeColor } from '../lib/scale'
 import { countryName } from '../lib/format'
 
 type Props = {
@@ -15,14 +15,16 @@ type Props = {
   onSelect: (iso: string | null, name: string) => void
   reducedMotion: boolean
   rotate: boolean // preferencia de la persona (botón «Girar»)
+  highlights?: { iso: string; lat: number; lng: number; label: string }[] // países con curiosidades del día
   colorKey: string // cambia cuando cambian los colores (tema, periodo)
 }
 
 type GlobeInstance = InstanceType<typeof Globe>
 
 const IDLE_RESUME_MS = 8000
+const STROKE = 'rgba(236,232,224,0.32)'
 
-export default function GlobeView({ geo, stateFor, describe, selected, onSelect, reducedMotion, rotate, colorKey }: Props) {
+export default function GlobeView({ geo, stateFor, describe, selected, onSelect, reducedMotion, rotate, highlights = [], colorKey }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const globe = useRef<GlobeInstance | null>(null)
   const lod = useRef<'110m' | '50m'>('110m')
@@ -45,14 +47,27 @@ export default function GlobeView({ geo, stateFor, describe, selected, onSelect,
     const el = host.current!
     const g = new Globe(el, { rendererConfig: { antialias: true, alpha: true, powerPreference: 'high-performance' } })
       .backgroundColor('rgba(0,0,0,0)')
+      // Tierra realista: NASA Blue Marble (dominio público) + relieve. Los datos van encima, semitransparentes.
+      .globeImageUrl(`${import.meta.env.BASE_URL}textures/earth-blue-marble.jpg`)
+      .bumpImageUrl(`${import.meta.env.BASE_URL}textures/earth-topology.png`)
       .showAtmosphere(true)
-      .atmosphereColor('#3987e5')
-      .atmosphereAltitude(0.16)
+      .atmosphereColor('#a9d8e6')
+      .atmosphereAltitude(0.17)
       .showGraticules(false)
       .polygonsData(geo.features)
       .polygonAltitude(0.006)
-      .polygonSideColor(() => 'rgba(20,30,50,0.6)')
-      .polygonStrokeColor(() => '#0b1220')
+      .polygonSideColor(() => 'rgba(236,232,224,0.05)')
+      .polygonStrokeColor(() => STROKE)
+      .pointsData([])
+      .pointColor(() => '#f0601a')
+      .pointAltitude(0.035)
+      .pointRadius(0.55)
+      .pointsMerge(false)
+      .pointLabel((d: object) => (d as { label: string }).label)
+      .onPointClick((d: object) => {
+        const h = d as { iso: string; label: string }
+        latest.current.onSelect(h.iso, h.label)
+      })
       .polygonsTransitionDuration(reducedMotion ? 0 : 250)
       .polygonLabel((d: object) => {
         const f = d as CountryFeature
@@ -67,9 +82,9 @@ export default function GlobeView({ geo, stateFor, describe, selected, onSelect,
       })
       .pointOfView({ lat: 15, lng: -40, altitude: 2.4 })
     const mat = g.globeMaterial() as MeshPhongMaterial
-    mat.color = new Color('#0c1729')
-    mat.emissive = new Color('#050a14')
-    mat.shininess = 6
+    mat.color = new Color('#9aa6b4') // atenúa la textura para que los colores de los datos se lean
+    mat.bumpScale = 6
+    mat.shininess = 4
     const controls = g.controls()
     controls.autoRotateSpeed = 0.5
     controls.enableDamping = true
@@ -131,8 +146,8 @@ export default function GlobeView({ geo, stateFor, describe, selected, onSelect,
   useEffect(() => {
     const g = globe.current
     if (!g) return
-    g.polygonCapColor((d: object) => stateColor(latest.current.stateFor((d as CountryFeature).properties.iso)))
-      .polygonStrokeColor((d: object) => ((d as CountryFeature).properties.iso === selected ? SELECTED_STROKE : '#0b1220'))
+    g.polygonCapColor((d: object) => globeColor(latest.current.stateFor((d as CountryFeature).properties.iso)))
+      .polygonStrokeColor((d: object) => ((d as CountryFeature).properties.iso === selected ? SELECTED_STROKE : STROKE))
       .polygonAltitude((d: object) => ((d as CountryFeature).properties.iso === selected ? 0.03 : 0.006))
   }, [colorKey, selected])
 
@@ -141,6 +156,10 @@ export default function GlobeView({ geo, stateFor, describe, selected, onSelect,
     globe.current?.polygonsTransitionDuration(reducedMotion ? 0 : 250)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reducedMotion, selected, rotate])
+
+  useEffect(() => {
+    globe.current?.pointsData(highlights)
+  }, [highlights])
 
   // Acercar la cámara al país seleccionado.
   useEffect(() => {

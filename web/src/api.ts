@@ -26,6 +26,7 @@ export type Meta = {
   proporcion_movil: Record<string, Record<string, number>>
   reporte_disponible: boolean
   demo: boolean
+  curiosidades_dias?: string[]
 }
 
 export type Trend = {

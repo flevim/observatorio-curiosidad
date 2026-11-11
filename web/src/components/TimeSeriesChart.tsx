@@ -3,8 +3,8 @@ import type { SeriesPayload } from '../api'
 import { compact, lang, num } from '../lib/format'
 
 // Colores categóricos fijos por idioma resaltado (paleta validada, variante oscura); el resto en gris de contexto.
-export const HL_COLORS = ['#3987e5', '#d95926', '#199e70']
-const CTX = '#4a4a46'
+export const HL_COLORS = ['#2a9db6', '#f0601a', '#9a72e0'] // validados para daltonismo sobre #07080a
+const CTX = 'rgba(236,232,224,0.18)'
 
 type Props = {
   data: SeriesPayload
@@ -38,7 +38,7 @@ export default function TimeSeriesChart({ data, daily, highlight, log, markers =
   }, [])
 
   const H = 220
-  const L = 48
+  const L = 60
   const R = 26
   const T = 10
   const B = 24

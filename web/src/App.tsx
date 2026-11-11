@@ -1,10 +1,11 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { geoCentroid } from 'd3-geo'
 import { api, type CountryFeature, type GeoJSON, type GlobeData, type Graph, type Meta } from './api'
 import About from './components/About'
 import CountryPanel from './components/CountryPanel'
 import CountryTable from './components/CountryTable'
 import FlatMap from './components/FlatMap'
-import Findings from './components/Findings'
+import Hero from './components/Hero'
 import Legend from './components/Legend'
 import SearchBox from './components/SearchBox'
 import Timeline from './components/Timeline'
@@ -44,6 +45,7 @@ export default function App() {
   // El globo gira al inicio; con «reducir movimiento» parte quieto, pero el botón permite activarlo.
   const [rotate, setRotate] = useState(() => !prefersReducedMotion())
 
+  const [todayIsos, setTodayIsos] = useState<string[]>([])
   const [volume, setVolume] = useState<GlobeData | null>(null)
   const [topicData, setTopicData] = useState<GlobeData | null>(null)
 
@@ -60,6 +62,23 @@ export default function App() {
     mq.addEventListener('change', on)
     return () => mq.removeEventListener('change', on)
   }, [loadMeta])
+
+  // Países con curiosidades en el último día: se marcan con un punto en el globo.
+  useEffect(() => {
+    api.dailyIndex().then((d) => d.dias[0] && api.curiosities(d.dias[0].fecha)).then(
+      (day) => day && setTodayIsos([...new Set(day.curiosidades.flatMap((c) => c.paises ?? []))]),
+      () => {},
+    )
+  }, [])
+  const highlights = useMemo(() => {
+    if (!geo) return []
+    return todayIsos.flatMap((iso) => {
+      const f = geo.features.find((x) => x.properties.iso === iso)
+      if (!f) return []
+      const [lng, lat] = geoCentroid(f as never)
+      return [{ iso, lat, lng, label: `<b>${countryName(iso)}</b><br/><small>con curiosidades del día</small>` }]
+    })
+  }, [geo, todayIsos])
 
   useEffect(() => {
     if (!topic) return setTopicData(null)
@@ -140,23 +159,36 @@ export default function App() {
   if (!meta || !geo) return <div className="loading" aria-busy="true">Cargando el observatorio…</div>
 
   const hasPeriods = !!period && globalIdx >= 0
+  const isHome = !panel && view !== 'tabla'
   const legendTitle = topicMode ? `«${topicNames[topic!]}» en los rankings por país` : 'Lectura de Wikipedia por país'
   const caption = hasPeriods
     ? `${topicMode ? 'Visitas al tema por cada 1.000 visitas del ranking del país' : 'Visitas diarias de los artículos del ranking'} · ${period.tipo === 'mes' ? `${periodLabel(period.id)} (${period.dias_muestreados.length} días muestreados)` : `día ${periodLabel(period.id)}`} · aproximado · Wikimedia`
     : 'Aún no se descargaron rankings por país.'
 
   return (
-    <div className={`app${panel ? ' has-panel' : ''}`} data-reduced-motion={reduced}>
+    <div className={`app${panel ? ' has-panel' : ''}${isHome ? ' home' : ''}`} data-reduced-motion={reduced}>
+      <div className="frame" aria-hidden="true" />
       <a href="#main-panel" className="skip">Saltar al panel</a>
       <header className="topbar">
-        <h1 className="brand"><button className="link" onClick={() => { setTopic(null); setTrail([]); setPanel(null); setSelected(null) }}>Observatorio de la Curiosidad</button></h1>
-        <SearchBox topics={meta.temas} onPick={(id) => goTopic(id)} />
-        <div className="seg" role="group" aria-label="Vista">
-          {(['globo', 'mapa', 'tabla'] as View[]).map((v) => (
-            <button key={v} aria-pressed={view === v} onClick={() => setView(v)}>{v === 'globo' ? 'Globo' : v === 'mapa' ? 'Mapa plano' : 'Tabla'}</button>
-          ))}
+        <div className="brand-wrap">
+          <h1 className="brand">
+            <button className="brand-btn" onClick={() => { setTopic(null); setTrail([]); setPanel(null); setSelected(null) }}>
+              Curiosidad<span className="dot">.</span>
+            </button>
+          </h1>
+          <button className="howto" onClick={() => setAbout(true)}>
+            Observatorio · Cómo funciona <span className="box" aria-hidden="true">?</span>
+          </button>
         </div>
-        <button className="ghost" onClick={() => setAbout(true)}>Acerca de los datos</button>
+        <div className="top-right">
+          {!isHome && <SearchBox topics={meta.temas} onPick={(id) => goTopic(id)} />}
+          <span className="stamp">Datos al <b>{periodLabel(meta.curiosidades_dias?.[0] ?? meta.mes_final)}</b> · UTC</span>
+          <div className="seg" role="group" aria-label="Vista">
+            {(['globo', 'mapa', 'tabla'] as View[]).map((v) => (
+              <button key={v} aria-pressed={view === v} onClick={() => setView(v)}>{v === 'globo' ? 'Globo' : v === 'mapa' ? 'Mapa' : 'Tabla'}</button>
+            ))}
+          </div>
+        </div>
       </header>
 
       {meta.demo && <p className="demo-banner" role="note">DATOS SINTÉTICOS DE PRUEBA: no describen la realidad.</p>}
@@ -185,6 +217,7 @@ export default function App() {
               onSelect={selectCountry}
               reducedMotion={reduced}
               rotate={rotate}
+              highlights={highlights}
               colorKey={`${topic}|${globalIdx}|${!!topicData}|${!!volume}`}
             />
           </Suspense>
@@ -200,7 +233,7 @@ export default function App() {
             selected={selected}
           />
         )}
-        {!panel && view !== 'tabla' && <Findings onTopic={(id) => goTopic(id)} onCountry={(iso) => selectCountry(iso, countryName(iso))} reportAvailable={meta.reporte_disponible} />}
+        {isHome && <Hero meta={meta} onTopic={(id) => goTopic(id)} onCountry={(iso) => selectCountry(iso, countryName(iso))} />}
         {view === 'globo' && (
           <button className="rotate-toggle ghost" aria-pressed={rotate} onClick={() => setRotate(!rotate)}>
             {rotate ? 'Pausar giro' : 'Girar globo'}
@@ -208,9 +241,6 @@ export default function App() {
         )}
         <div className="overlay-bottom">
           <Legend scale={hasPeriods ? scale : null} title={legendTitle} topicMode={topicMode} caption={caption} />
-          {!topic && (
-            <p className="hint">Elige un tema en el buscador para ver dónde aparece, o haz clic en un país para ver lo más leído.</p>
-          )}
         </div>
       </main>
 
