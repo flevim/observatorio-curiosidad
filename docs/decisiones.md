@@ -68,3 +68,13 @@ El «mes» de la app es el promedio de los días observados y se rotula como apr
   desde la app (ejecuta el pipeline en segundo plano, de a un trabajo por vez).
 - La web nunca llama a Wikimedia: todo pasa por la API.
 - Sin Docker, colas ni base de datos: no hacen falta para este volumen.
+
+## Exploración libre en Wikipedia (excepción a «la web no llama a Wikimedia»)
+
+El buscador ofrece «Buscar en Wikipedia» para cualquier artículo. Esa vista consulta **en vivo**, desde el navegador,
+la búsqueda de Wikipedia, el resumen del artículo, los enlaces interlingüísticos y la API de visitas de Wikimedia
+(`web/src/lib/wikipedia.ts`). Es la única excepción a la regla de que la web solo lee datos procesados, porque no es
+posible precalcular todos los artículos. Para no abusar del servicio, las peticiones van en serie, con caché en memoria
+y sin cabeceras propias (con `Api-User-Agent`, la API de visitas rechaza el preflight CORS). La interfaz dice que son
+datos en vivo y sin analizar. Desde ahí se puede proponer el artículo como tema: en local lo agrega la API; en la versión
+publicada se abre una propuesta (issue) en GitHub con la línea lista para `config/topics.yaml`.

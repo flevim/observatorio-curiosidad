@@ -42,6 +42,8 @@ export default function About({ meta, onClose, onTopicAdded }: Props) {
           <li><strong>Panel del tema</strong>: las visitas de personas (sin bots identificados) a los artículos de cada <em>edición de idioma</em> desde julio de 2015. Son <strong>exactas</strong>, pero no dicen desde qué país se leyeron.</li>
           <li>Un idioma no equivale a un país: el español se lee en más de 20 países, y el inglés en todo el mundo.</li>
           <li>Gris rayado o «sin datos» significa que no hay información, nunca «cero interés».</li>
+          <li><strong>Búsqueda en Wikipedia</strong>: cualquier artículo, con sus visitas consultadas en vivo a Wikimedia desde tu navegador
+            (Wikimedia ve tu búsqueda, como al usar Wikipedia). Son datos sin analizar: sin picos, estacionalidad ni datos por país.</li>
         </ul>
 
         <h3>Limitaciones</h3>

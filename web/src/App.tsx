@@ -6,6 +6,7 @@ import CountryPanel from './components/CountryPanel'
 import CountryTable from './components/CountryTable'
 import FlatMap from './components/FlatMap'
 import Hero from './components/Hero'
+import ExplorePanel from './components/ExplorePanel'
 import Legend from './components/Legend'
 import SearchBox from './components/SearchBox'
 import Timeline from './components/Timeline'
@@ -16,7 +17,7 @@ import { buildScale, countryState, type CountryState } from './lib/scale'
 const GlobeView = lazy(() => import('./components/GlobeView'))
 
 type View = 'globo' | 'mapa' | 'tabla'
-type Panel = { kind: 'topic' } | { kind: 'country'; iso: string; name: string } | null
+type Panel = { kind: 'topic' } | { kind: 'country'; iso: string; name: string } | { kind: 'explore'; query: string } | null
 
 // Estado inicial leído una sola vez desde el enlace (#tema=…&periodo=…&pais=…&vista=…).
 function readHash() {
@@ -147,6 +148,12 @@ export default function App() {
     [],
   )
 
+  const explore = useCallback((query: string) => {
+    setPanel({ kind: 'explore', query })
+    setSheet('peek')
+    setPlaying(false)
+  }, [])
+
   const selectCountry = useCallback((iso: string | null, name: string) => {
     if (!iso) return
     setSelected(iso)
@@ -181,7 +188,7 @@ export default function App() {
           </button>
         </div>
         <div className="top-right">
-          {!isHome && <SearchBox topics={meta.temas} onPick={(id) => goTopic(id)} />}
+          {!isHome && <SearchBox topics={meta.temas} onPick={(id) => goTopic(id)} onExplore={explore} />}
           <span className="stamp">Datos al <b>{periodLabel(meta.curiosidades_dias?.[0] ?? meta.mes_final)}</b> · UTC</span>
           <div className="seg" role="group" aria-label="Vista">
             {(['globo', 'mapa', 'tabla'] as View[]).map((v) => (
@@ -233,7 +240,7 @@ export default function App() {
             selected={selected}
           />
         )}
-        {isHome && <Hero meta={meta} onTopic={(id) => goTopic(id)} onCountry={(iso) => selectCountry(iso, countryName(iso))} />}
+        {isHome && <Hero meta={meta} onTopic={(id) => goTopic(id)} onCountry={(iso) => selectCountry(iso, countryName(iso))} onExplore={explore} />}
         {view === 'globo' && (
           <button className="rotate-toggle ghost" aria-pressed={rotate} onClick={() => setRotate(!rotate)}>
             {rotate ? 'Pausar giro' : 'Girar globo'}
@@ -295,6 +302,14 @@ export default function App() {
               topicNames={topicNames}
               onTopic={(id) => goTopic(id)}
               onClose={() => { setPanel(topic ? { kind: 'topic' } : null); setSelected(null) }}
+            />
+          )}
+          {panel.kind === 'explore' && (
+            <ExplorePanel
+              query={panel.query}
+              topics={meta.temas}
+              onTopic={(id) => goTopic(id)}
+              onClose={() => setPanel(topic ? { kind: 'topic' } : null)}
             />
           )}
           {panel.kind === 'country' && topic && (

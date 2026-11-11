@@ -40,3 +40,4 @@ temas:
   - {id: telescopio-james-webb, nombre: Telescopio James Webb, semilla: {idioma: en, titulo: James Webb Space Telescope}}
   - {id: bitcoin, nombre: Bitcoin, semilla: {idioma: en, titulo: Bitcoin}}
   - {id: futbol, nombre: Fútbol, semilla: {idioma: en, titulo: Association football}}
+  - {id: valle-inquietante, nombre: Valle inquietante, semilla: {idioma: es, titulo: Valle inquietante}}

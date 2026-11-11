@@ -98,6 +98,12 @@ Pruebas:
 .venv/Scripts/python -m pytest
 ```
 
+## Búsqueda libre en Wikipedia
+
+Además de los temas del observatorio, el buscador ofrece «Buscar en Wikipedia»: cualquier artículo, en cualquiera de los
+10 idiomas, con sus visitas consultadas en vivo a Wikimedia (mensuales desde 2015 o diarias del último año) y su
+comparación entre idiomas. No tiene el análisis completo ni datos por país; desde ahí se puede proponer como tema.
+
 ## Curiosidades diarias
 
 Cada día Wikimedia publica los rankings del día anterior. El comando

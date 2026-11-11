@@ -7,10 +7,11 @@ type Props = {
   meta: Meta
   onTopic: (id: string) => void
   onCountry: (iso: string) => void
+  onExplore: (q: string) => void
 }
 
 /** Portada: qué es esto, buscador grande, accesos rápidos y las curiosidades del día. */
-export default function Hero({ meta, onTopic, onCountry }: Props) {
+export default function Hero({ meta, onTopic, onCountry, onExplore }: Props) {
   // Accesos rápidos: los tres temas con más visitas en los últimos 12 meses.
   const quick = useMemo(
     () => [...meta.temas].sort((a, b) => (b.visitas_12m ?? 0) - (a.visitas_12m ?? 0)).slice(0, 3),
@@ -32,12 +33,12 @@ export default function Hero({ meta, onTopic, onCountry }: Props) {
         ¿Qué le da <em>curiosidad</em> al mundo?
       </h1>
       <p className="hero-lede">
-        Lo que la gente lee en Wikipedia, país por país y día a día. Busca un tema o toca un país en el globo para ver lo
-        que se encontró ahí.
+        Lo que la gente lee en Wikipedia, país por país y día a día. Busca un tema del observatorio, cualquier artículo de
+        Wikipedia, o toca un país en el globo para ver lo que se encontró ahí.
       </p>
 
-      <p className="step">A — Tema</p>
-      <SearchBox topics={meta.temas} onPick={onTopic} big />
+      <p className="step">A — Tema o artículo</p>
+      <SearchBox topics={meta.temas} onPick={onTopic} onExplore={onExplore} big />
 
       <p className="step step-row">
         <span>B — O prueba</span>

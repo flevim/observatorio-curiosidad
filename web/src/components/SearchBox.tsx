@@ -2,10 +2,10 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { TopicSummary } from '../api'
 import { fold } from '../lib/format'
 
-type Props = { topics: TopicSummary[]; onPick: (id: string) => void; big?: boolean }
+type Props = { topics: TopicSummary[]; onPick: (id: string) => void; onExplore?: (q: string) => void; big?: boolean }
 
 /** Combobox accesible (patrón ARIA 1.2) con autocompletado sin tildes. Filtra en el cliente: la lista ya está en meta. */
-export default function SearchBox({ topics, onPick, big }: Props) {
+export default function SearchBox({ topics, onPick, onExplore, big }: Props) {
   const input = useRef<HTMLInputElement>(null)
   // Atajo «/» para enfocar el buscador (como en muchos sitios de búsqueda), salvo si ya se escribe en un campo.
   useEffect(() => {
@@ -37,8 +37,20 @@ export default function SearchBox({ topics, onPick, big }: Props) {
     return scored.slice(0, 8).map((x) => x.t)
   }, [q, topics])
 
+  // Última opción: buscar el texto en Wikipedia (exploración en vivo), si hay texto y la función existe.
+  const exploreQ = q.trim()
+  const hasExplore = !!onExplore && exploreQ.length > 0
+  const total = results.length + (hasExplore ? 1 : 0)
+  const exploreIdx = results.length
+
   const pick = (t: TopicSummary) => {
     onPick(t.id)
+    setQ('')
+    setOpen(false)
+  }
+  const explore = () => {
+    if (!hasExplore) return
+    onExplore!(exploreQ)
     setQ('')
     setOpen(false)
   }
@@ -56,10 +68,10 @@ export default function SearchBox({ topics, onPick, big }: Props) {
         ref={input}
         placeholder={big ? 'Buscar un tema' : 'Buscar tema…'}
         role="combobox"
-        aria-expanded={open && results.length > 0}
+        aria-expanded={open && total > 0}
         aria-controls={`${id}-list`}
         aria-autocomplete="list"
-        aria-activedescendant={open && results[active] ? `${id}-${results[active].id}` : undefined}
+        aria-activedescendant={open && total > 0 ? (active === exploreIdx && hasExplore ? `${id}-wiki` : results[active] ? `${id}-${results[active].id}` : undefined) : undefined}
         value={q}
         autoComplete="off"
         onChange={(e) => {
@@ -72,13 +84,14 @@ export default function SearchBox({ topics, onPick, big }: Props) {
         onKeyDown={(e) => {
           if (e.key === 'ArrowDown') {
             setOpen(true)
-            setActive((a) => Math.min(results.length - 1, a + 1))
+            setActive((a) => Math.min(total - 1, a + 1))
             e.preventDefault()
           } else if (e.key === 'ArrowUp') {
             setActive((a) => Math.max(0, a - 1))
             e.preventDefault()
-          } else if (e.key === 'Enter' && results[active]) {
-            pick(results[active])
+          } else if (e.key === 'Enter' && (results[active] || (hasExplore && active === exploreIdx))) {
+            if (results[active]) pick(results[active])
+            else explore()
             e.preventDefault()
           } else if (e.key === 'Escape') {
             setOpen(false)
@@ -86,7 +99,7 @@ export default function SearchBox({ topics, onPick, big }: Props) {
         }}
       />
       {big && <kbd className="kbd" aria-hidden="true">/</kbd>}
-      {open && results.length > 0 && (
+      {open && total > 0 && (
         <ul id={`${id}-list`} role="listbox" className="search-list">
           {results.map((t, i) => (
             <li
@@ -105,9 +118,24 @@ export default function SearchBox({ topics, onPick, big }: Props) {
               {t.descripcion && <span className="muted small">{t.descripcion}</span>}
             </li>
           ))}
+          {hasExplore && (
+            <li
+              id={`${id}-wiki`}
+              role="option"
+              aria-selected={active === exploreIdx}
+              className={`explore-opt${active === exploreIdx ? ' active' : ''}`}
+              onMouseDown={(e) => {
+                e.preventDefault()
+                explore()
+              }}
+              onMouseEnter={() => setActive(exploreIdx)}
+            >
+              <span>Buscar «{exploreQ}» en Wikipedia →</span>
+              <span className="muted small">Cualquier artículo, con sus visitas en vivo</span>
+            </li>
+          )}
         </ul>
       )}
-      {open && q && results.length === 0 && <div className="search-list empty">Sin resultados. Puedes agregarlo desde «Acerca de los datos».</div>}
     </div>
   )
 }
