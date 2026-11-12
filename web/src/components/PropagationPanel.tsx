@@ -11,6 +11,7 @@ type Props = {
   dayIdx: number
   onDay: (i: number) => void
   reducedMotion: boolean
+  controls?: boolean // false: la reproducción está en la barra inferior de la vista Propagación
   onCountry: (iso: string) => void
   onTopic: (id: string) => void
   onClose: () => void
@@ -31,7 +32,7 @@ export function propDays(art: PropArticle): string[] {
   return out
 }
 
-export default function PropagationPanel({ art, dayIdx, onDay, reducedMotion, onCountry, onTopic, onClose }: Props) {
+export default function PropagationPanel({ art, dayIdx, onDay, reducedMotion, controls = true, onCountry, onTopic, onClose }: Props) {
   const days = useMemo(() => propDays(art), [art])
   const [playing, setPlaying] = useState(false)
   const day = days[Math.min(dayIdx, days.length - 1)]
@@ -78,7 +79,7 @@ export default function PropagationPanel({ art, dayIdx, onDay, reducedMotion, on
       </p>
 
       <h3>Día a día</h3>
-      <div className="prop-controls">
+      {controls && <div className="prop-controls">
         <button className="play" onClick={() => {
           if (!playing && dayIdx >= days.length - 1) onDay(0)
           setPlaying(!playing)
@@ -88,7 +89,7 @@ export default function PropagationPanel({ art, dayIdx, onDay, reducedMotion, on
         <input type="range" min={0} max={days.length - 1} step={1} value={dayIdx}
           onChange={(e) => { setPlaying(false); onDay(Number(e.target.value)) }}
           aria-label="Día de la propagación" aria-valuetext={dateLabel(day)} />
-      </div>
+      </div>}
       <p className="prop-day"><b>{dateLabel(day)}</b> · {arrived} {arrived === 1 ? 'país' : 'países'} · {nuevos} {nuevos === 1 ? 'nuevo' : 'nuevos'}</p>
       <ul className="prop-legend">
         <li><i style={{ background: PROP_NEW }} />llega ese día</li>

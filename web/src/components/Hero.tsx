@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { Meta, PropArticle } from '../api'
+import type { Meta } from '../api'
 import Findings from './Findings'
 import SearchBox from './SearchBox'
 
@@ -8,11 +8,10 @@ type Props = {
   onTopic: (id: string) => void
   onCountry: (iso: string) => void
   onExplore: (q: string) => void
-  onPropagation: (a: PropArticle) => void
 }
 
 /** Portada: qué es esto, buscador grande, accesos rápidos y las curiosidades del día. */
-export default function Hero({ meta, onTopic, onCountry, onExplore, onPropagation }: Props) {
+export default function Hero({ meta, onTopic, onCountry, onExplore }: Props) {
   // Accesos rápidos: los tres temas con más visitas en los últimos 12 meses.
   const quick = useMemo(
     () => [...meta.temas].sort((a, b) => (b.visitas_12m ?? 0) - (a.visitas_12m ?? 0)).slice(0, 3),
@@ -53,7 +52,7 @@ export default function Hero({ meta, onTopic, onCountry, onExplore, onPropagatio
       </div>
 
       <p className="step">C — {last ? 'Lo curioso, día a día' : 'Hallazgos'}</p>
-      <Findings onTopic={onTopic} onCountry={onCountry} onExplore={onExplore} onPropagation={onPropagation} reportAvailable={meta.reporte_disponible} />
+      <Findings onTopic={onTopic} onCountry={onCountry} onExplore={onExplore} reportAvailable={meta.reporte_disponible} />
     </section>
   )
 }

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { geoCentroid } from 'd3-geo'
-import { api, type PropArticle, type CountryFeature, type GeoJSON, type GlobeData, type Graph, type Meta } from './api'
+import { api, type PropArticle, type Propagation, type CountryFeature, type GeoJSON, type GlobeData, type Graph, type Meta } from './api'
 import About from './components/About'
 import CountryPanel from './components/CountryPanel'
 import CountryTable from './components/CountryTable'
@@ -8,6 +8,7 @@ import FlatMap from './components/FlatMap'
 import Hero from './components/Hero'
 import ExplorePanel from './components/ExplorePanel'
 import PropagationPanel, { PROP_NEW, PROP_OLD, PROP_WAIT, propDays } from './components/PropagationPanel'
+import { PropagationList, PropagationTimeline } from './components/PropagationView'
 import type { Arc } from './components/GlobeView'
 import Legend from './components/Legend'
 import SearchBox from './components/SearchBox'
@@ -18,8 +19,8 @@ import { buildScale, countryState, type CountryState } from './lib/scale'
 
 const GlobeView = lazy(() => import('./components/GlobeView'))
 
-type View = 'globo' | 'mapa' | 'tabla'
-type Panel = { kind: 'topic' } | { kind: 'country'; iso: string; name: string } | { kind: 'explore'; query: string } | { kind: 'propagation'; art: PropArticle } | null
+type View = 'globo' | 'mapa' | 'tabla' | 'propagacion'
+type Panel = { kind: 'topic' } | { kind: 'country'; iso: string; name: string } | { kind: 'explore'; query: string } | null
 
 // Estado inicial leído una sola vez desde el enlace (#tema=…&periodo=…&pais=…&vista=…).
 function readHash() {
@@ -85,7 +86,15 @@ export default function App() {
 
   // Modo propagación: el globo colorea por día de llegada y dibuja arcos desde el país de origen.
   const [propDay, setPropDay] = useState(0)
-  const propArt = panel?.kind === 'propagation' ? panel.art : null
+  const [propData, setPropData] = useState<Propagation | null>(null)
+  const [propSelId, setPropSelId] = useState<string | null>(null)
+  useEffect(() => {
+    if (view === 'propagacion' && !propData) api.propagation().then((d) => setPropData(d ?? { dias: [], articulos: [] }), () => {})
+  }, [view, propData])
+  const propArt =
+    view === 'propagacion' && propData?.articulos.length
+      ? propData.articulos.find((a) => a.id === propSelId) ?? propData.articulos[0]
+      : null
   const propOverride = useMemo(() => {
     if (!propArt || !geo) return null
     const days = propDays(propArt)
@@ -183,12 +192,18 @@ export default function App() {
     [],
   )
 
-  const showPropagation = useCallback((art: PropArticle) => {
+  const pickPropagation = useCallback((art: PropArticle) => {
+    setPropSelId(art.id)
     setPropDay(0)
-    setPanel({ kind: 'propagation', art })
     setSheet('peek')
-    setPlaying(false)
-    setSelected(null)
+  }, [])
+  const changeView = useCallback((v: View) => {
+    setView(v)
+    if (v === 'propagacion') {
+      setPanel(null)
+      setSelected(null)
+      setPlaying(false)
+    }
   }, [])
 
   const explore = useCallback((query: string) => {
@@ -209,14 +224,20 @@ export default function App() {
   if (!meta || !geo) return <div className="loading" aria-busy="true">Cargando el observatorio…</div>
 
   const hasPeriods = !!period && globalIdx >= 0
-  const isHome = !panel && view !== 'tabla'
+  const isProp = view === 'propagacion'
+  const isHome = !panel && view !== 'tabla' && !isProp
+  const hasPanel = !!panel || (isProp && !!propArt)
+  const pDays = propArt ? propDays(propArt) : []
+  const pDay = pDays[Math.min(propDay, pDays.length - 1)]
+  const pArrived = propArt ? Object.values(propArt.paises).filter((p) => p.dia <= pDay).length : 0
+  const pNew = propArt ? Object.values(propArt.paises).filter((p) => p.dia === pDay).length : 0
   const legendTitle = topicMode ? `«${topicNames[topic!]}» en los rankings por país` : 'Lectura de Wikipedia por país'
   const caption = hasPeriods
     ? `${topicMode ? 'Visitas al tema por cada 1.000 visitas del ranking del país' : 'Visitas diarias de los artículos del ranking'} · ${period.tipo === 'mes' ? `${periodLabel(period.id)} (${period.dias_muestreados.length} días muestreados)` : `día ${periodLabel(period.id)}`} · aproximado · Wikimedia`
     : 'Aún no se descargaron rankings por país.'
 
   return (
-    <div className={`app${panel ? ' has-panel' : ''}${isHome ? ' home' : ''}`} data-reduced-motion={reduced}>
+    <div className={`app${hasPanel ? ' has-panel' : ''}${isHome ? ' home' : ''}${isProp ? ' prop-view' : ''}`} data-reduced-motion={reduced}>
       <div className="frame" aria-hidden="true" />
       <a href="#main-panel" className="skip">Saltar al panel</a>
       <header className="topbar">
@@ -234,8 +255,10 @@ export default function App() {
           {!isHome && <SearchBox topics={meta.temas} onPick={(id) => goTopic(id)} onExplore={explore} />}
           <span className="stamp">Datos al <b>{periodLabel(meta.curiosidades_dias?.[0] ?? meta.mes_final)}</b> · UTC</span>
           <div className="seg" role="group" aria-label="Vista">
-            {(['globo', 'mapa', 'tabla'] as View[]).map((v) => (
-              <button key={v} aria-pressed={view === v} onClick={() => setView(v)}>{v === 'globo' ? 'Globo' : v === 'mapa' ? 'Mapa' : 'Tabla'}</button>
+            {(['globo', 'mapa', 'tabla', 'propagacion'] as View[]).map((v) => (
+              <button key={v} aria-pressed={view === v} className={v === 'propagacion' ? 'seg-accent' : undefined} onClick={() => changeView(v)}>
+                {v === 'globo' ? 'Globo' : v === 'mapa' ? 'Mapa' : v === 'tabla' ? 'Tabla' : 'Propagación'}
+              </button>
             ))}
           </div>
         </div>
@@ -257,7 +280,7 @@ export default function App() {
       </nav>
 
       <main className="stage" aria-label="Mapa de atención">
-        {view === 'globo' && (
+        {(view === 'globo' || isProp) && (
           <Suspense fallback={<div className="loading">Cargando globo…</div>}>
             <GlobeView
               geo={geo}
@@ -284,7 +307,12 @@ export default function App() {
             selected={selected}
           />
         )}
-        {isHome && <Hero meta={meta} onTopic={(id) => goTopic(id)} onCountry={(iso) => selectCountry(iso, countryName(iso))} onExplore={explore} onPropagation={showPropagation} />}
+        {isHome && <Hero meta={meta} onTopic={(id) => goTopic(id)} onCountry={(iso) => selectCountry(iso, countryName(iso))} onExplore={explore} />}
+        {isProp && propData && (
+          propData.articulos.length ? (
+            <PropagationList items={propData.articulos.slice(0, 20)} selectedId={propArt?.id ?? null} onSelect={pickPropagation} dias={propData.dias.length} />
+          ) : <p className="hint prop-empty">Aún no hay artículos que hayan pasado por varios países en los días recientes.</p>
+        )}
         {view === 'globo' && (
           <button className="rotate-toggle ghost" aria-pressed={rotate} onClick={() => setRotate(!rotate)}>
             {rotate ? 'Pausar giro' : 'Girar globo'}
@@ -296,6 +324,10 @@ export default function App() {
       </main>
 
       <footer className="bottombar">
+        {isProp ? (
+          <PropagationTimeline days={pDays} dayIdx={Math.min(propDay, Math.max(0, pDays.length - 1))} onDay={setPropDay}
+            arrived={pArrived} nuevos={pNew} reducedMotion={reduced} />
+        ) : (<>
         <Timeline periods={periods} index={Math.max(0, idx)} onIndex={setIdx} playing={playing} onPlaying={setPlaying} kind={kind} onKind={(k) => { setKind(k); setPlaying(false) }} />
         <label className="country-pick">
           <span className="sr-only">Elegir país</span>
@@ -306,9 +338,10 @@ export default function App() {
             ))}
           </select>
         </label>
+        </>)}
       </footer>
 
-      {panel && (
+      {hasPanel && (
         <aside id="main-panel" className={`panel sheet-${sheet}`} aria-labelledby="panel-title" tabIndex={-1}>
           <button
             className="sheet-handle"
@@ -328,7 +361,19 @@ export default function App() {
               window.addEventListener('pointerup', up)
             }}
           />
-          {panel.kind === 'topic' && topic && (
+          {isProp && propArt && (
+            <PropagationPanel
+              art={propArt}
+              dayIdx={propDay}
+              onDay={setPropDay}
+              reducedMotion={reduced}
+              controls={false}
+              onCountry={(iso) => { setView('globo'); selectCountry(iso, countryName(iso)) }}
+              onTopic={(id) => { setView('globo'); goTopic(id) }}
+              onClose={() => changeView('globo')}
+            />
+          )}
+          {!isProp && panel?.kind === 'topic' && topic && (
             <TopicPanel
               topics={meta.temas}
               topicId={topic}
@@ -339,7 +384,7 @@ export default function App() {
               onSelectCountry={(iso) => selectCountry(iso, countryName(iso))}
             />
           )}
-          {panel.kind === 'country' && period && (
+          {!isProp && panel?.kind === 'country' && period && (
             <CountryPanel
               iso={panel.iso}
               name={panel.name}
@@ -349,18 +394,7 @@ export default function App() {
               onClose={() => { setPanel(topic ? { kind: 'topic' } : null); setSelected(null) }}
             />
           )}
-          {panel.kind === 'propagation' && (
-            <PropagationPanel
-              art={panel.art}
-              dayIdx={propDay}
-              onDay={setPropDay}
-              reducedMotion={reduced}
-              onCountry={(iso) => selectCountry(iso, countryName(iso))}
-              onTopic={(id) => goTopic(id)}
-              onClose={() => setPanel(topic ? { kind: 'topic' } : null)}
-            />
-          )}
-          {panel.kind === 'explore' && (
+          {!isProp && panel?.kind === 'explore' && (
             <ExplorePanel
               query={panel.query}
               topics={meta.temas}
@@ -368,7 +402,7 @@ export default function App() {
               onClose={() => setPanel(topic ? { kind: 'topic' } : null)}
             />
           )}
-          {panel.kind === 'country' && topic && (
+          {!isProp && panel?.kind === 'country' && topic && (
             <button className="ghost back-topic" onClick={() => setPanel({ kind: 'topic' })}>← Volver a «{topicNames[topic]}»</button>
           )}
         </aside>

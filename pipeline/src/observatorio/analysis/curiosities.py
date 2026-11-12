@@ -260,7 +260,9 @@ def propagation(tops: pd.DataFrame, resolved: dict, names: dict[str, str], days:
     stats = first.groupby("clave").agg(n=("country", "nunique"), inicio=("dia", "min"), fin=("dia", "max"))
     stats = stats[(stats["n"] >= min_countries) & (stats["inicio"] > pd.Timestamp(days[0]))]
     stats = stats.assign(span=(stats["fin"] - stats["inicio"]).dt.days)
-    stats = stats.sort_values(["n", "span"], ascending=False).head(top)
+    # Primero los que más «viajaron»: muchos países y varios días (llegar a todos el mismo día no muestra recorrido).
+    stats = stats.assign(viaje=stats["n"] * (stats["span"] + 1))
+    stats = stats.sort_values(["viaje", "n"], ascending=False).head(top)
     # Artículo representativo de cada clave: el de más visitas.
     rep_rows = window.sort_values("views_ceil", ascending=False).drop_duplicates("clave").set_index("clave")
     out = []
