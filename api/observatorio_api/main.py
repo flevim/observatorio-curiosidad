@@ -189,6 +189,12 @@ def weekly(request: Request):
     return json_file("semana.json", request)
 
 
+@app.get("/api/propagacion")
+def propagation(request: Request):
+    """Cómo se propagaron los artículos entre países en los días recientes."""
+    return json_file("propagacion.json", request)
+
+
 @app.get("/api/geo/{lod}")
 def geo(lod: str, request: Request):
     name = {"110m": "countries.geojson", "50m": "countries-50m.geojson"}.get(lod)

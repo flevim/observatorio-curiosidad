@@ -1,12 +1,14 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { geoCentroid } from 'd3-geo'
-import { api, type CountryFeature, type GeoJSON, type GlobeData, type Graph, type Meta } from './api'
+import { api, type PropArticle, type CountryFeature, type GeoJSON, type GlobeData, type Graph, type Meta } from './api'
 import About from './components/About'
 import CountryPanel from './components/CountryPanel'
 import CountryTable from './components/CountryTable'
 import FlatMap from './components/FlatMap'
 import Hero from './components/Hero'
 import ExplorePanel from './components/ExplorePanel'
+import PropagationPanel, { PROP_NEW, PROP_OLD, PROP_WAIT, propDays } from './components/PropagationPanel'
+import type { Arc } from './components/GlobeView'
 import Legend from './components/Legend'
 import SearchBox from './components/SearchBox'
 import Timeline from './components/Timeline'
@@ -17,7 +19,7 @@ import { buildScale, countryState, type CountryState } from './lib/scale'
 const GlobeView = lazy(() => import('./components/GlobeView'))
 
 type View = 'globo' | 'mapa' | 'tabla'
-type Panel = { kind: 'topic' } | { kind: 'country'; iso: string; name: string } | { kind: 'explore'; query: string } | null
+type Panel = { kind: 'topic' } | { kind: 'country'; iso: string; name: string } | { kind: 'explore'; query: string } | { kind: 'propagation'; art: PropArticle } | null
 
 // Estado inicial leído una sola vez desde el enlace (#tema=…&periodo=…&pais=…&vista=…).
 function readHash() {
@@ -80,6 +82,39 @@ export default function App() {
       return [{ iso, lat, lng, label: `<b>${countryName(iso)}</b><br/><small>con curiosidades del día</small>` }]
     })
   }, [geo, todayIsos])
+
+  // Modo propagación: el globo colorea por día de llegada y dibuja arcos desde el país de origen.
+  const [propDay, setPropDay] = useState(0)
+  const propArt = panel?.kind === 'propagation' ? panel.art : null
+  const propOverride = useMemo(() => {
+    if (!propArt || !geo) return null
+    const days = propDays(propArt)
+    const day = days[Math.min(propDay, days.length - 1)]
+    const conDatos = new Set(meta?.paises_con_datos ?? [])
+    const cent = (iso: string) => {
+      const f = geo.features.find((x) => x.properties.iso === iso)
+      return f ? geoCentroid(f as never) : null
+    }
+    const o = cent(propArt.origen)
+    const arcs: Arc[] = []
+    if (o) {
+      for (const [iso, p] of Object.entries(propArt.paises)) {
+        if (iso === propArt.origen || p.dia > day) continue
+        const c = cent(iso)
+        if (c) arcs.push({ startLng: o[0], startLat: o[1], endLng: c[0], endLat: c[1], color: p.dia === day ? PROP_NEW : 'rgba(42,157,182,0.55)' })
+      }
+    }
+    return {
+      color: (iso: string | null) => {
+        if (!iso) return null
+        const p = propArt.paises[iso]
+        if (p && p.dia <= day) return p.dia === day ? PROP_NEW : PROP_OLD
+        return conDatos.has(iso) ? PROP_WAIT : null
+      },
+      arcs,
+      focus: o ? { lat: o[1], lng: o[0] } : null,
+    }
+  }, [propArt, propDay, geo, meta])
 
   useEffect(() => {
     if (!topic) return setTopicData(null)
@@ -147,6 +182,14 @@ export default function App() {
     },
     [],
   )
+
+  const showPropagation = useCallback((art: PropArticle) => {
+    setPropDay(0)
+    setPanel({ kind: 'propagation', art })
+    setSheet('peek')
+    setPlaying(false)
+    setSelected(null)
+  }, [])
 
   const explore = useCallback((query: string) => {
     setPanel({ kind: 'explore', query })
@@ -223,9 +266,10 @@ export default function App() {
               selected={selected}
               onSelect={selectCountry}
               reducedMotion={reduced}
-              rotate={rotate}
+              rotate={rotate && !propArt}
               highlights={highlights}
-              colorKey={`${topic}|${globalIdx}|${!!topicData}|${!!volume}`}
+              override={propOverride}
+              colorKey={`${topic}|${globalIdx}|${!!topicData}|${!!volume}|${propArt?.id ?? ''}|${propDay}`}
             />
           </Suspense>
         )}
@@ -240,14 +284,14 @@ export default function App() {
             selected={selected}
           />
         )}
-        {isHome && <Hero meta={meta} onTopic={(id) => goTopic(id)} onCountry={(iso) => selectCountry(iso, countryName(iso))} onExplore={explore} />}
+        {isHome && <Hero meta={meta} onTopic={(id) => goTopic(id)} onCountry={(iso) => selectCountry(iso, countryName(iso))} onExplore={explore} onPropagation={showPropagation} />}
         {view === 'globo' && (
           <button className="rotate-toggle ghost" aria-pressed={rotate} onClick={() => setRotate(!rotate)}>
             {rotate ? 'Pausar giro' : 'Girar globo'}
           </button>
         )}
         <div className="overlay-bottom">
-          <Legend scale={hasPeriods ? scale : null} title={legendTitle} topicMode={topicMode} caption={caption} />
+          {!propArt && <Legend scale={hasPeriods ? scale : null} title={legendTitle} topicMode={topicMode} caption={caption} />}
         </div>
       </main>
 
@@ -303,6 +347,17 @@ export default function App() {
               topicNames={topicNames}
               onTopic={(id) => goTopic(id)}
               onClose={() => { setPanel(topic ? { kind: 'topic' } : null); setSelected(null) }}
+            />
+          )}
+          {panel.kind === 'propagation' && (
+            <PropagationPanel
+              art={panel.art}
+              dayIdx={propDay}
+              onDay={setPropDay}
+              reducedMotion={reduced}
+              onCountry={(iso) => selectCountry(iso, countryName(iso))}
+              onTopic={(id) => goTopic(id)}
+              onClose={() => setPanel(topic ? { kind: 'topic' } : null)}
             />
           )}
           {panel.kind === 'explore' && (

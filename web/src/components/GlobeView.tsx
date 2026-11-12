@@ -16,6 +16,8 @@ type Props = {
   reducedMotion: boolean
   rotate: boolean // preferencia de la persona (botón «Girar»)
   highlights?: { iso: string; lat: number; lng: number; label: string }[] // países con curiosidades del día
+  // Modo propagación: color por país (null = color normal) y arcos desde el país de origen.
+  override?: { color: (iso: string | null) => string | null; arcs: Arc[]; focus?: { lat: number; lng: number } | null } | null
   colorKey: string // cambia cuando cambian los colores (tema, periodo)
 }
 
@@ -24,12 +26,14 @@ type GlobeInstance = InstanceType<typeof Globe>
 const IDLE_RESUME_MS = 8000
 const STROKE = 'rgba(236,235,243,0.32)'
 
-export default function GlobeView({ geo, stateFor, describe, selected, onSelect, reducedMotion, rotate, highlights = [], colorKey }: Props) {
+export type Arc = { startLat: number; startLng: number; endLat: number; endLng: number; color: string }
+
+export default function GlobeView({ geo, stateFor, describe, selected, onSelect, reducedMotion, rotate, highlights = [], override = null, colorKey }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const globe = useRef<GlobeInstance | null>(null)
   const lod = useRef<'110m' | '50m'>('110m')
-  const latest = useRef({ stateFor, describe, selected, onSelect, rotate })
-  latest.current = { stateFor, describe, selected, onSelect, rotate }
+  const latest = useRef({ stateFor, describe, selected, onSelect, rotate, override })
+  latest.current = { stateFor, describe, selected, onSelect, rotate, override }
   const interacting = useRef(false)
   const idleTimer = useRef<number | undefined>(undefined)
 
@@ -146,7 +150,10 @@ export default function GlobeView({ geo, stateFor, describe, selected, onSelect,
   useEffect(() => {
     const g = globe.current
     if (!g) return
-    g.polygonCapColor((d: object) => globeColor(latest.current.stateFor((d as CountryFeature).properties.iso)))
+    g.polygonCapColor((d: object) => {
+      const iso = (d as CountryFeature).properties.iso
+      return latest.current.override?.color(iso) ?? globeColor(latest.current.stateFor(iso))
+    })
       .polygonStrokeColor((d: object) => ((d as CountryFeature).properties.iso === selected ? SELECTED_STROKE : STROKE))
       .polygonAltitude((d: object) => ((d as CountryFeature).properties.iso === selected ? 0.03 : 0.006))
   }, [colorKey, selected])
@@ -158,8 +165,32 @@ export default function GlobeView({ geo, stateFor, describe, selected, onSelect,
   }, [reducedMotion, selected, rotate])
 
   useEffect(() => {
-    globe.current?.pointsData(highlights)
-  }, [highlights])
+    globe.current?.pointsData(override ? [] : highlights)
+  }, [highlights, override])
+
+  // Al abrir una propagación: dejar de girar y mirar al país de origen.
+  const focusKey = override?.focus ? `${override.focus.lat},${override.focus.lng}` : ''
+  useEffect(() => {
+    const g = globe.current
+    const f = latest.current.override?.focus
+    if (!g || !f) return
+    g.controls().autoRotate = false
+    if (host.current) host.current.dataset.autorotate = 'false'
+    g.pointOfView({ lat: f.lat, lng: f.lng, altitude: 2.1 }, reducedMotion ? 0 : 1200)
+  }, [focusKey, reducedMotion])
+
+  // Arcos de propagación: desde el país de origen hacia cada país al que llegó el artículo.
+  useEffect(() => {
+    const g = globe.current
+    if (!g) return
+    g.arcsData(override?.arcs ?? [])
+      .arcColor((d: object) => (d as Arc).color)
+      .arcStroke(0.45)
+      .arcAltitudeAutoScale(0.45)
+      .arcDashLength(reducedMotion ? 1 : 0.45)
+      .arcDashGap(reducedMotion ? 0 : 0.25)
+      .arcDashAnimateTime(reducedMotion ? 0 : 1800)
+  }, [override, reducedMotion])
 
   // Acercar la cámara al país seleccionado.
   useEffect(() => {

@@ -157,6 +157,12 @@ export type Weekly = {
   tendencias: Record<string, TrendingItem[]>
 }
 
+export type PropArticle = {
+  id: string; titulo: string; tema: string | null; enlace: CuriosityLink; inicio: string; n: number
+  dias_propagacion: number; origen: string; paises: Record<string, { dia: string; visitas: number }>
+}
+export type Propagation = { dias: string[]; articulos: PropArticle[] }
+
 const cache = new Map<string, Promise<unknown>>()
 
 async function get<T>(path: string, useCache = true): Promise<T> {
@@ -219,6 +225,8 @@ export const api = {
   curiosities: (day: string) => get<DailyCuriosities>(STATIC ? data(`daily/${day}.json`) : `/api/curiosidades/${day}`),
   trending: () => (STATIC ? getOptional<Trending | null>(data('trending.json'), null) : get<Trending>('/api/tendencias').catch(() => null)),
   weekly: () => (STATIC ? getOptional<Weekly | null>(data('semana.json'), null) : get<Weekly>('/api/semana').catch(() => null)),
+  propagation: () =>
+    STATIC ? getOptional<Propagation | null>(data('propagacion.json'), null) : get<Propagation>('/api/propagacion').catch(() => null),
   geo: (lod: '110m' | '50m') =>
     get<GeoJSON>(STATIC ? data(lod === '50m' ? 'countries-50m.geojson' : 'countries.geojson') : `/api/geo/${lod}`),
   addTopic: async (body: { nombre: string; titulo?: string; idioma: string; wikidata?: string }) => {

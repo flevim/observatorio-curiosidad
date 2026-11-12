@@ -61,3 +61,18 @@ def test_country_profile_excludes_main_page_and_counts_days():
 def test_unprefixed_main_pages_are_not_articles():
     assert not is_article("Hauptseite")
     assert is_article("Hauptstadt")
+
+
+def test_propagation_first_day_per_country_and_origin():
+    from observatorio.analysis.curiosities import propagation
+
+    rows = []
+    for d, countries in (("2026-11-01", ["CL"]), ("2026-11-02", ["CL", "AR"]), ("2026-11-03", ["CL", "AR", "MX", "PE"])):
+        for c in countries:
+            rows.append(_row(c, d, 1, "Viaje", 9000 if c == "CL" else 2000))
+    rows.append(_row("CL", "2026-10-31", 2, "Otro", 1500))  # el primer día de la ventana: se descarta
+    p = propagation(pd.DataFrame(rows), RESOLVED, NAMES, ["2026-10-31", "2026-11-01", "2026-11-02", "2026-11-03"])
+    assert len(p["articulos"]) == 1
+    a = p["articulos"][0]
+    assert a["origen"] == "CL" and a["n"] == 4 and a["dias_propagacion"] == 2
+    assert a["paises"]["AR"]["dia"] == "2026-11-02" and a["paises"]["PE"]["dia"] == "2026-11-03"

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { api, reportUrl, type DailyCuriosities, type Finding, type Trending, type Weekly } from '../api'
-import { dateLabel, lang } from '../lib/format'
+import { api, reportUrl, type DailyCuriosities, type Finding, type PropArticle, type Propagation, type Trending, type Weekly } from '../api'
+import { countryName, dateLabel, lang } from '../lib/format'
 import CuriosityList from './CuriosityList'
 import TrendingList from './TrendingList'
 
@@ -8,13 +8,14 @@ type Props = {
   onTopic: (id: string) => void
   onCountry: (iso: string) => void
   onExplore: (q: string) => void
+  onPropagation: (a: PropArticle) => void
   reportAvailable: boolean
 }
 
-type Tab = 'dia' | 'tendencias' | 'semana' | 'hallazgos'
+type Tab = 'dia' | 'propagacion' | 'tendencias' | 'semana' | 'hallazgos'
 
 /** Tarjeta de inicio: curiosidades del día (se renuevan con la actualización diaria) y hallazgos de fondo. */
-export default function Findings({ onTopic, onCountry, onExplore, reportAvailable }: Props) {
+export default function Findings({ onTopic, onCountry, onExplore, onPropagation, reportAvailable }: Props) {
   const [items, setItems] = useState<Finding[]>([])
   const [days, setDays] = useState<string[]>([])
   const [dayIdx, setDayIdx] = useState(0)
@@ -22,12 +23,14 @@ export default function Findings({ onTopic, onCountry, onExplore, reportAvailabl
   const [tab, setTab] = useState<Tab>('dia')
   const [trending, setTrending] = useState<Trending | null>(null)
   const [weekly, setWeekly] = useState<Weekly | null>(null)
+  const [prop, setProp] = useState<Propagation | null>(null)
   const [open, setOpen] = useState(() => window.matchMedia('(min-width: 768px)').matches)
 
   useEffect(() => {
     api.findings().then((f) => setItems(f.sorprendentes), () => setItems([]))
     api.trending().then(setTrending, () => setTrending(null))
     api.weekly().then(setWeekly, () => setWeekly(null))
+    api.propagation().then(setProp, () => setProp(null))
     api.dailyIndex().then(
       (d) => {
         setDays(d.dias.map((x) => x.fecha))
@@ -49,6 +52,11 @@ export default function Findings({ onTopic, onCountry, onExplore, reportAvailabl
           {days.length > 0 && (
             <button role="tab" aria-selected={tab === 'dia'} aria-pressed={tab === 'dia'} onClick={() => { setTab('dia'); setOpen(true) }}>
               Del día
+            </button>
+          )}
+          {prop && prop.articulos.length > 0 && (
+            <button role="tab" aria-selected={tab === 'propagacion'} aria-pressed={tab === 'propagacion'} onClick={() => { setTab('propagacion'); setOpen(true) }}>
+              Propagación
             </button>
           )}
           {trending && (
@@ -89,6 +97,28 @@ export default function Findings({ onTopic, onCountry, onExplore, reportAvailabl
               </p>
             </>
           ) : <p className="muted pad">Cargando…</p>}
+        </div>
+      )}
+
+      {open && tab === 'propagacion' && prop && (
+        <div id="findings-body" role="tabpanel">
+          <p className="day-title pad-top">Cómo viajan los artículos entre países</p>
+          <ol className="trend-list">
+            {prop.articulos.slice(0, 12).map((a) => (
+              <li key={a.id}>
+                <div className="toprow">
+                  <button className="link strong" onClick={() => onPropagation(a)}>{a.titulo}</button>
+                  <span className="num">{a.n} países</span>
+                </div>
+                <p className="muted small" style={{ margin: '2px 0 0' }}>
+                  Desde {countryName(a.origen)} · {a.dias_propagacion + 1} {a.dias_propagacion === 0 ? 'día' : 'días'} · {dateLabel(a.inicio)}
+                </p>
+              </li>
+            ))}
+          </ol>
+          <p className="muted small pad">
+            Artículos que entraron en el ranking de 4 o más países en los últimos {prop.dias.length} días. Toca uno para verlo viajar en el globo.
+          </p>
         </div>
       )}
 

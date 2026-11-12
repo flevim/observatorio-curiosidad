@@ -232,3 +232,51 @@ def daily_curiosities(tops: pd.DataFrame, resolved: dict, names: dict[str, str],
         "curiosidades": items,
         "nota": "Rankings diarios por país de Wikimedia (aproximados). «Nuevo» = no estaba en los días anteriores observados.",
     }
+
+
+# ---------------------------------------------------------------- propagación entre países
+
+
+def propagation(tops: pd.DataFrame, resolved: dict, names: dict[str, str], days: list[str], top: int = 40,
+                min_countries: int = 4) -> dict:
+    """Cómo se propagó cada artículo entre países durante los días recientes con ranking completo.
+
+    Para cada artículo: el primer día en que entró en el ranking de cada país y sus visitas máximas allí.
+    Los temas del observatorio se agrupan entre idiomas (su artículo en cualquier edición cuenta); el resto
+    se cuenta por edición. Se descartan los que ya estaban el primer día de la ventana: no se sabe cuándo empezaron.
+    """
+    if len(days) < 3:
+        return {"dias": days, "articulos": []}
+    arts = _articles(tops)
+    window = arts[arts["date"].dt.strftime("%Y-%m-%d").isin(days)].copy()
+    if window.empty:
+        return {"dias": days, "articulos": []}
+    tmap = _topic_map(resolved)
+    window["tema"] = [tmap.get((p, a)) for p, a in zip(window["project"], window["article"])]
+    # Ojo: pandas convierte None en NaN (que es «verdadero»); por eso se comprueba que sea texto.
+    window["clave"] = [f"tema:{t}" if isinstance(t, str) else f"{p}|{a}"
+                       for t, p, a in zip(window["tema"], window["project"], window["article"])]
+    first = window.groupby(["clave", "country"]).agg(dia=("date", "min"), visitas=("views_ceil", "max")).reset_index()
+    stats = first.groupby("clave").agg(n=("country", "nunique"), inicio=("dia", "min"), fin=("dia", "max"))
+    stats = stats[(stats["n"] >= min_countries) & (stats["inicio"] > pd.Timestamp(days[0]))]
+    stats = stats.assign(span=(stats["fin"] - stats["inicio"]).dt.days)
+    stats = stats.sort_values(["n", "span"], ascending=False).head(top)
+    # Artículo representativo de cada clave: el de más visitas.
+    rep_rows = window.sort_values("views_ceil", ascending=False).drop_duplicates("clave").set_index("clave")
+    out = []
+    for clave, st in stats.iterrows():
+        r = rep_rows.loc[clave]
+        fc = first[first["clave"] == clave].sort_values(["dia", "visitas"], ascending=[True, False])
+        tema = r["tema"] if isinstance(r["tema"], str) else None
+        out.append({
+            "id": clave,
+            "titulo": names.get(tema, r["article"].replace("_", " ")) if tema else r["article"].replace("_", " "),
+            "tema": tema,
+            "enlace": link(r["project"], r["article"]),
+            "inicio": st["inicio"].strftime("%Y-%m-%d"),
+            "n": int(st["n"]),
+            "dias_propagacion": int(st["span"]),
+            "origen": fc.iloc[0]["country"],
+            "paises": {c.country: {"dia": c.dia.strftime("%Y-%m-%d"), "visitas": int(c.visitas)} for c in fc.itertuples()},
+        })
+    return {"dias": days, "articulos": out}

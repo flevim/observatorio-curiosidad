@@ -264,6 +264,8 @@ def export(progress=print) -> None:
                 daily_index.append({"fecha": d, "n": len(cur["curiosidades"])})
                 day_files.append(cur)
         _compact({"dias": sorted(daily_index, key=lambda x: x["fecha"], reverse=True)}, out / "daily" / "index.json")
+        recent_days = sorted({p["id"] for p in periods if p["tipo"] == "dia"})
+        _compact(Q.propagation(tops, resolved, tnames, recent_days), out / "propagacion.json")
 
     # Lo más leído en cada edición (último día publicado) y resumen semanal.
     trending_path = PATHS.processed / "trending.json"

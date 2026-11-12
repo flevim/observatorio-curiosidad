@@ -437,3 +437,19 @@ dialog.about::backdrop { transition: opacity 200ms ease; }
 .week-sec { border-top: 1px solid var(--line); margin-top: 10px; }
 .week-title { margin: 10px 14px 0; font: 10.5px var(--font-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--accent); }
 .findings-head .seg { flex-wrap: wrap; }
+
+/* ---------- propagación */
+.prop-controls { display: flex; align-items: center; gap: 12px; }
+.prop-controls input[type='range'] { flex: 1; accent-color: var(--accent); }
+.prop-day { font: 11px var(--font-mono); letter-spacing: .04em; color: var(--ink-2); margin: 8px 0; }
+.prop-day b { color: var(--accent); font-weight: 500; }
+.prop-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; list-style: none; padding: 0; margin: 4px 0 0; font: 10.5px var(--font-mono); color: var(--ink-2); }
+.prop-legend li { display: flex; align-items: center; gap: 6px; }
+.prop-legend i { width: 12px; height: 12px; display: inline-block; }
+.prop-list { list-style: none; padding: 0; margin: 6px 0; }
+.prop-list li { padding: 8px 0 8px 12px; border-left: 2px solid var(--line); margin: 0 0 4px; }
+.prop-list li.past { border-left-color: #2a9db6; }
+.prop-list li.now { border-left-color: var(--accent); }
+.prop-date { margin: 0; font: 10.5px var(--font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--ink-2); }
+.prop-list li.now .prop-date { color: var(--accent); }
+.prop-countries { margin: 4px 0 0; font-size: .86rem; line-height: 1.7; }
