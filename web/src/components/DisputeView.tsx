@@ -74,7 +74,8 @@ export default function DisputeView({ data }: { data: Disputes }) {
 
 function Detail({ a, semana }: { a: DisputeArticle; semana: Disputes['semana'] }) {
   return (
-    <article>
+    <article className="disp-article">
+      <div className="disp-a">
       <p className="eyebrow">{lang(a.idioma)} · {a.idioma}.wikipedia</p>
       <h2 className="disp-title"><a href={a.enlace} target="_blank" rel="noreferrer">{a.titulo} ↗</a></h2>
       <p className="disp-summary">{a.resumen}</p>
@@ -85,6 +86,22 @@ function Detail({ a, semana }: { a: DisputeArticle; semana: Disputes['semana'] }
 
       <Chart a={a} semana={semana} />
 
+      <h3>Protecciones en los últimos 90 días</h3>
+      {a.protecciones.length === 0 ? <p className="muted">Ninguna.</p> : (
+        <ul className="disp-prot">
+          {a.protecciones.map((p, i) => (
+            <li key={i}>
+              <span className="disp-when">{p.fecha} UTC</span>
+              <span><b>{p.accion}</b>{p.nivel ? <> · <code>{p.nivel}</code></> : null}</span>
+              {p.motivo && <span className="disp-why">Motivo: «{p.motivo}»</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="muted small">Mide conflicto, no intención: no sabemos quién editó ni si hubo coordinación. Los motivos de protección los escriben los administradores de Wikipedia.</p>
+      </div>
+
+      <div className="disp-b">
       <h3>Días en disputa</h3>
       {a.dias_disputa.length === 0 && <p className="muted">Las revertidas se repartieron en la semana: ningún día cumple la regla de «día en disputa».</p>}
       {a.dias_disputa.map((d) => (
@@ -109,20 +126,7 @@ function Detail({ a, semana }: { a: DisputeArticle; semana: Disputes['semana'] }
           )}
         </section>
       ))}
-
-      <h3>Protecciones en los últimos 90 días</h3>
-      {a.protecciones.length === 0 ? <p className="muted">Ninguna.</p> : (
-        <ul className="disp-prot">
-          {a.protecciones.map((p, i) => (
-            <li key={i}>
-              <span className="disp-when">{p.fecha} UTC</span>
-              <span><b>{p.accion}</b>{p.nivel ? <> · <code>{p.nivel}</code></> : null}</span>
-              {p.motivo && <span className="disp-why">Motivo: «{p.motivo}»</span>}
-            </li>
-          ))}
-        </ul>
-      )}
-      <p className="muted small">Mide conflicto, no intención: no sabemos quién editó ni si hubo coordinación. Los motivos de protección los escriben los administradores de Wikipedia.</p>
+      </div>
     </article>
   )
 }

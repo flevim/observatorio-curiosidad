@@ -545,3 +545,11 @@ dialog.about::backdrop { transition: opacity 200ms ease; }
   .disp-view, .disp-side, .disp-detail { min-width: 0; max-width: 100%; }
   .disp-pick .pp-meta { white-space: normal; }
 }
+@media (min-width: 1280px) {
+  /* Pantallas anchas: título, gráfico y protecciones a la izquierda; días en disputa a la derecha. */
+  .disp-detail { max-width: none; }
+  .disp-article { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 0 48px; align-items: start; }
+  .disp-b > h3:first-child { margin-top: 0; }
+  .disp-frags { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .disp-frags > p { grid-column: 1 / -1; }
+}
