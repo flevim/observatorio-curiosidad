@@ -163,6 +163,26 @@ export type PropArticle = {
 }
 export type Propagation = { dias: string[]; articulos: PropArticle[] }
 
+export type Fragment = { texto: string; veces: number }
+export type DisputeDay = {
+  dia: string; ediciones: number; revertidas: number; reversiones: number; minutos: number; editores: number; sin_cuenta: number
+  secciones: { seccion: string; ediciones: number }[]; entraba: Fragment[]; salia: Fragment[]; diffs_revisados: number
+  frases: string[]; enlaces: { hora: string; url: string }[]
+}
+export type DisputeArticle = {
+  id: string; titulo: string; idioma: string; enlace: string; historial: string; registro_protecciones: string
+  revertidas_semana: number; ediciones_semana: number; habitual_por_dia: number | null; dias_comparados: number
+  esperadas_semana: number; veces: number | null; puntaje: number; creado: string | null; nuevo: boolean
+  historial_completo: boolean; resumen: string; dias_disputa: DisputeDay[]
+  protecciones: { fecha: string; accion: string; nivel: string; motivo: string }[]
+  serie: [string, number, number, number | null][]
+}
+export type Disputes = {
+  generado: string; semana: { inicio: string; fin: string }; ventana: { inicio: string; fin: string }; idiomas: string[]
+  reglas: { min_revertidas: number; min_puntaje: number; candidatos_por_idioma: number; diffs_por_dia: number }
+  avisos: string[]; articulos: DisputeArticle[]
+}
+
 const cache = new Map<string, Promise<unknown>>()
 
 async function get<T>(path: string, useCache = true): Promise<T> {
@@ -227,6 +247,7 @@ export const api = {
   weekly: () => (STATIC ? getOptional<Weekly | null>(data('semana.json'), null) : get<Weekly>('/api/semana').catch(() => null)),
   propagation: () =>
     STATIC ? getOptional<Propagation | null>(data('propagacion.json'), null) : get<Propagation>('/api/propagacion').catch(() => null),
+  disputes: () => (STATIC ? getOptional<Disputes | null>(data('disputa.json'), null) : get<Disputes>('/api/disputa').catch(() => null)),
   geo: (lod: '110m' | '50m') =>
     get<GeoJSON>(STATIC ? data(lod === '50m' ? 'countries-50m.geojson' : 'countries.geojson') : `/api/geo/${lod}`),
   addTopic: async (body: { nombre: string; titulo?: string; idioma: string; wikidata?: string }) => {

@@ -53,3 +53,14 @@ def test_add_topic_rate_limit_per_ip(monkeypatch):
     with pytest.raises(HTTPException) as e:
         m._check_limits(Req())
     assert e.value.status_code == 429
+
+
+def test_disputes_endpoint_serves_export_or_404():
+    r = client.get("/api/disputa")
+    if not (PATHS.web / "disputa.json").exists():
+        assert r.status_code == 404
+        return
+    d = r.json()
+    assert {"semana", "reglas", "articulos"} <= d.keys()
+    for a in d["articulos"]:
+        assert a["enlace"].startswith(f"https://{a['idioma']}.wikipedia.org/wiki/")

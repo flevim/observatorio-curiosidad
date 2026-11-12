@@ -290,6 +290,10 @@ def export(progress=print) -> None:
     if weekly:
         _compact(weekly, out / "semana.json")
 
+    disputa_path = PATHS.processed / "disputa.json"
+    if disputa_path.exists():
+        _compact(json.loads(disputa_path.read_text(encoding="utf-8")), out / "disputa.json")
+
     report_path = PATHS.reports / "observatorio.html"
     meta = {
         "generado": pd.Timestamp.now(tz="UTC").isoformat(),

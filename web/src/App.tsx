@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { geoCentroid } from 'd3-geo'
-import { api, type PropArticle, type Propagation, type CountryFeature, type GeoJSON, type GlobeData, type Graph, type Meta } from './api'
+import { api, type PropArticle, type Propagation, type Disputes, type CountryFeature, type GeoJSON, type GlobeData, type Graph, type Meta } from './api'
 import About from './components/About'
 import CountryPanel from './components/CountryPanel'
 import CountryTable from './components/CountryTable'
@@ -9,6 +9,7 @@ import Hero from './components/Hero'
 import ExplorePanel from './components/ExplorePanel'
 import PropagationPanel, { PROP_NEW, PROP_OLD, PROP_WAIT, propDays } from './components/PropagationPanel'
 import { PropagationList, PropagationTimeline } from './components/PropagationView'
+import DisputeView from './components/DisputeView'
 import type { Arc } from './components/GlobeView'
 import Legend from './components/Legend'
 import SearchBox from './components/SearchBox'
@@ -19,7 +20,7 @@ import { buildScale, countryState, type CountryState } from './lib/scale'
 
 const GlobeView = lazy(() => import('./components/GlobeView'))
 
-type View = 'globo' | 'mapa' | 'tabla' | 'propagacion'
+type View = 'globo' | 'mapa' | 'tabla' | 'propagacion' | 'disputa'
 type Panel = { kind: 'topic' } | { kind: 'country'; iso: string; name: string } | { kind: 'explore'; query: string } | null
 
 // Estado inicial leído una sola vez desde el enlace (#tema=…&periodo=…&pais=…&vista=…).
@@ -91,6 +92,10 @@ export default function App() {
   useEffect(() => {
     if (view === 'propagacion' && !propData) api.propagation().then((d) => setPropData(d ?? { dias: [], articulos: [] }), () => {})
   }, [view, propData])
+  const [dispData, setDispData] = useState<Disputes | null | undefined>(undefined)
+  useEffect(() => {
+    if (view === 'disputa' && dispData === undefined) api.disputes().then((d) => setDispData(d), () => setDispData(null))
+  }, [view, dispData])
   const propArt =
     view === 'propagacion' && propData?.articulos.length
       ? propData.articulos.find((a) => a.id === propSelId) ?? propData.articulos[0]
@@ -199,7 +204,7 @@ export default function App() {
   }, [])
   const changeView = useCallback((v: View) => {
     setView(v)
-    if (v === 'propagacion') {
+    if (v === 'propagacion' || v === 'disputa') {
       setPanel(null)
       setSelected(null)
       setPlaying(false)
@@ -225,8 +230,9 @@ export default function App() {
 
   const hasPeriods = !!period && globalIdx >= 0
   const isProp = view === 'propagacion'
-  const isHome = !panel && view !== 'tabla' && !isProp
-  const hasPanel = !!panel || (isProp && !!propArt)
+  const isDisp = view === 'disputa'
+  const isHome = !panel && view !== 'tabla' && !isProp && !isDisp
+  const hasPanel = (!!panel && !isDisp) || (isProp && !!propArt)
   const pDays = propArt ? propDays(propArt) : []
   const pDay = pDays[Math.min(propDay, pDays.length - 1)]
   const pArrived = propArt ? Object.values(propArt.paises).filter((p) => p.dia <= pDay).length : 0
@@ -237,7 +243,7 @@ export default function App() {
     : 'Aún no se descargaron rankings por país.'
 
   return (
-    <div className={`app${hasPanel ? ' has-panel' : ''}${isHome ? ' home' : ''}${isProp ? ' prop-view' : ''}`} data-reduced-motion={reduced}>
+    <div className={`app${hasPanel ? ' has-panel' : ''}${isHome ? ' home' : ''}${isProp ? ' prop-view' : ''}${isDisp ? ' disp-mode' : ''}`} data-reduced-motion={reduced}>
       <div className="frame" aria-hidden="true" />
       <a href="#main-panel" className="skip">Saltar al panel</a>
       <header className="topbar">
@@ -255,9 +261,9 @@ export default function App() {
           {!isHome && <SearchBox topics={meta.temas} onPick={(id) => goTopic(id)} onExplore={explore} />}
           <span className="stamp">Datos al <b>{periodLabel(meta.curiosidades_dias?.[0] ?? meta.mes_final)}</b> · UTC</span>
           <div className="seg" role="group" aria-label="Vista">
-            {(['globo', 'mapa', 'tabla', 'propagacion'] as View[]).map((v) => (
-              <button key={v} aria-pressed={view === v} className={v === 'propagacion' ? 'seg-accent' : undefined} onClick={() => changeView(v)}>
-                {v === 'globo' ? 'Globo' : v === 'mapa' ? 'Mapa' : v === 'tabla' ? 'Tabla' : 'Propagación'}
+            {(['globo', 'mapa', 'tabla', 'propagacion', 'disputa'] as View[]).map((v) => (
+              <button key={v} aria-pressed={view === v} className={v === 'propagacion' || v === 'disputa' ? 'seg-accent' : undefined} onClick={() => changeView(v)}>
+                {v === 'globo' ? 'Globo' : v === 'mapa' ? 'Mapa' : v === 'tabla' ? 'Tabla' : v === 'propagacion' ? 'Propagación' : 'Bajo disputa'}
               </button>
             ))}
           </div>
@@ -318,13 +324,17 @@ export default function App() {
             {rotate ? 'Pausar giro' : 'Girar globo'}
           </button>
         )}
+        {isDisp && (dispData ? <DisputeView data={dispData} />
+          : <p className="hint prop-empty">{dispData === null ? 'Aún no hay datos de «Bajo disputa». Ejecuta: python -m observatorio disputa && python -m observatorio export' : 'Cargando…'}</p>)}
         <div className="overlay-bottom">
-          {!propArt && <Legend scale={hasPeriods ? scale : null} title={legendTitle} topicMode={topicMode} caption={caption} />}
+          {!propArt && !isDisp && <Legend scale={hasPeriods ? scale : null} title={legendTitle} topicMode={topicMode} caption={caption} />}
         </div>
       </main>
 
       <footer className="bottombar">
-        {isProp ? (
+        {isDisp ? (
+          <p className="disp-foot">Fuente: Wikipedia (historial de ediciones, registro de protecciones) y Wikimedia (visitas). Se actualiza cada día.</p>
+        ) : isProp ? (
           <PropagationTimeline days={pDays} dayIdx={Math.min(propDay, Math.max(0, pDays.length - 1))} onDay={setPropDay}
             arrived={pArrived} nuevos={pNew} reducedMotion={reduced} />
         ) : (<>

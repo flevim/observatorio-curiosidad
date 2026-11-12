@@ -484,3 +484,64 @@ dialog.about::backdrop { transition: opacity 200ms ease; }
   .prop-side .hero-lede, .prop-side .kicker { display: none; }
   .prop-side-title { font-size: 1.5rem; margin-bottom: 6px; }
 }
+
+/* ---------- Bajo disputa ---------- */
+.disp-view { position: absolute; inset: 0; display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: 40px; padding: 8px 22px 14px; }
+.disp-side, .disp-detail { overflow-y: auto; min-height: 0; padding-right: 8px; scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }
+.disp-side .hero-lede { margin: 12px 0 16px; }
+.disp-langs { margin: 0 0 12px; flex-wrap: wrap; }
+.disp-sub { margin: 22px 0 4px; font: 500 1rem/1.3 var(--font-sans); }
+.disp-method { margin: 22px 0 8px; border-top: 1px solid var(--line); padding-top: 12px; color: var(--ink-2); font-size: .9rem; }
+.disp-method summary { cursor: pointer; color: var(--ink); }
+.disp-method ul { padding-left: 18px; margin: 10px 0; }
+.disp-method li { margin: 6px 0; }
+.disp-detail { max-width: 760px; }
+.disp-title { margin: 6px 0 8px; font: 500 clamp(1.6rem, 2.6vw, 2.2rem)/1.1 var(--font-serif); letter-spacing: -0.02em; }
+.disp-title a { text-decoration: none; }
+.disp-summary { color: var(--ink-2); margin: 0 0 8px; max-width: 62ch; }
+.disp-links { display: flex; gap: 18px; flex-wrap: wrap; margin: 0 0 16px; font-size: .9rem; }
+.disp-chart { margin: 0 0 18px; }
+.disp-chart svg { width: 100%; height: auto; display: block; }
+.disp-week { fill: rgba(236, 235, 243, 0.05); }
+.disp-views { fill: none; stroke: var(--ink-2); stroke-width: 1.2; }
+.disp-ed { fill: rgba(236, 235, 243, 0.42); }
+.disp-rev { fill: var(--accent); }
+.disp-axis { stroke: var(--line-2); stroke-width: 1; }
+.disp-prot-line { stroke: var(--accent); stroke-width: 1.2; stroke-dasharray: 3 3; }
+.disp-lbl { fill: var(--muted); font: 10.5px var(--font-mono); }
+.disp-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .8rem; color: var(--ink-2); margin-top: 4px; }
+.disp-legend .sw { display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: -1px; }
+.disp-legend .sw.ed { background: rgba(236, 235, 243, 0.42); }
+.disp-legend .sw.rev { background: var(--accent); }
+.disp-legend .sw.prot { height: 0; border-top: 1.5px dashed var(--accent); vertical-align: 3px; }
+.disp-legend .sw.week { background: rgba(236, 235, 243, 0.12); }
+.disp-detail h3 { margin: 26px 0 8px; font: 500 1rem/1.3 var(--font-sans); }
+.disp-day { border-top: 1px solid var(--line); padding: 12px 0 6px; }
+.disp-day h4 { margin: 0 0 6px; font: 500 .9rem var(--font-mono); color: var(--accent); }
+.disp-day p { margin: 4px 0; }
+.disp-frags { margin: 10px 0 4px; display: grid; gap: 10px; }
+.disp-frag-h { font: 10.5px var(--font-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 4px !important; }
+.disp-frag-list { list-style: none; margin: 0; padding: 0; }
+.disp-frag-list li { margin: 4px 0; overflow-wrap: anywhere; }
+.disp-frag-list code { background: rgba(236, 235, 243, 0.06); padding: 2px 6px; white-space: pre-wrap; }
+.disp-diffs summary { cursor: pointer; color: var(--ink-2); font-size: .9rem; }
+.disp-diffs p { display: flex; flex-wrap: wrap; gap: 6px 12px; font: .85rem var(--font-mono); }
+.disp-prot { list-style: none; margin: 0; padding: 0; }
+.disp-prot li { display: grid; gap: 2px; padding: 8px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+.disp-when { font: 10.5px var(--font-mono); color: var(--muted); }
+.disp-why { color: var(--ink-2); }
+.disp-foot { margin: 0; color: var(--muted); font-size: .8rem; align-self: center; }
+@media (max-width: 767px) {
+  .disp-view { position: static; display: block; padding: 0 14px 24px; }
+  .disp-side, .disp-detail { overflow: visible; padding-right: 0; }
+  .disp-detail { margin-top: 24px; }
+  .app.disp-mode .stage { overflow-y: auto; }
+}
+@media (max-width: 767px) {
+  /* Cinco vistas no caben en una fila de 375px: el menú se desliza en horizontal en vez de ensanchar la página. */
+  .app { grid-template-columns: minmax(0, 1fr); }
+  .top-right > .seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .top-right > .seg button { padding: 0 10px; flex: 0 0 auto; }
+  .disp-view, .disp-side, .disp-detail { min-width: 0; max-width: 100%; }
+  .disp-pick .pp-meta { white-space: normal; }
+}

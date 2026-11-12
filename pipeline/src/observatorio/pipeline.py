@@ -118,6 +118,21 @@ def fetch(
     return report
 
 
+def fetch_disputes_to_disk(progress: Progress = _print) -> None:
+    """«Bajo disputa»: artículos con más ediciones revertidas de lo habitual (ver analysis/disputes.py)."""
+    from .sources.disputes import fetch_disputes
+
+    PATHS.ensure()
+    require_contact()
+    client = PoliteClient()
+    try:
+        save_json(fetch_disputes(client, progress), PATHS.processed / "disputa.json")
+    except Exception as e:  # un fallo aquí no debe frenar la actualización diaria
+        progress(f"  aviso: bajo disputa no se pudo actualizar: {e}")
+    finally:
+        client.close()
+
+
 def daily(progress: Progress = _print) -> None:
     """Actualización diaria (pensada para el programador de tareas):
     1. descarga solo los días nuevos de visitas y rankings (todo lo demás sale de la caché);
@@ -129,6 +144,7 @@ def daily(progress: Progress = _print) -> None:
 
     t0 = time.time()
     fetch(incremental=True, progress=progress)
+    fetch_disputes_to_disk(progress=progress)
     analyze(progress=progress)
     build_report()
     export(progress=progress)

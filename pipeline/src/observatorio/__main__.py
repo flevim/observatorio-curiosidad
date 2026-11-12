@@ -29,6 +29,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("demo", help="genera datos SINTÉTICOS marcados como tales (para probar sin conexión)")
     st = sub.add_parser("site", help="arma el sitio estático (web compilada con VITE_STATIC=1 + datos + reporte)")
     st.add_argument("--out", default="site", help="carpeta de salida (por defecto: site)")
+    sub.add_parser("disputa", help="descarga y calcula «Bajo disputa» (ediciones revertidas de la última semana)")
     sub.add_parser("daily", help="actualización diaria: descarga solo lo nuevo, recalcula y genera las curiosidades del día")
 
     args = parser.parse_args(argv)
@@ -44,6 +45,11 @@ def main(argv: list[str] | None = None) -> int:
         from .site import build_site
 
         print(f"Sitio estático: {build_site(args.out)}")
+        return 0
+    if args.cmd == "disputa":
+        from .pipeline import fetch_disputes_to_disk
+
+        fetch_disputes_to_disk()
         return 0
     if args.cmd == "daily":
         from .pipeline import daily

@@ -195,6 +195,12 @@ def propagation(request: Request):
     return json_file("propagacion.json", request)
 
 
+@app.get("/api/disputa")
+def disputes(request: Request):
+    """Artículos con más ediciones revertidas de lo habitual en la última semana."""
+    return json_file("disputa.json", request)
+
+
 @app.get("/api/geo/{lod}")
 def geo(lod: str, request: Request):
     name = {"110m": "countries.geojson", "50m": "countries-50m.geojson"}.get(lod)
