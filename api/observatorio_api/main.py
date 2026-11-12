@@ -177,6 +177,18 @@ def daily_day(day: str, request: Request):
     return json_file(f"daily/{day}.json", request)
 
 
+@app.get("/api/tendencias")
+def trending(request: Request):
+    """Lo más leído en cada edición de Wikipedia el último día publicado."""
+    return json_file("trending.json", request)
+
+
+@app.get("/api/semana")
+def weekly(request: Request):
+    """Resumen de la última semana con datos."""
+    return json_file("semana.json", request)
+
+
 @app.get("/api/geo/{lod}")
 def geo(lod: str, request: Request):
     name = {"110m": "countries.geojson", "50m": "countries-50m.geojson"}.get(lod)

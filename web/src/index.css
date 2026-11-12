@@ -426,3 +426,14 @@ dialog.about::backdrop { transition: opacity 200ms ease; }
 .extract { margin: 0; color: var(--ink-2); font-size: 0.86rem; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
 .known { border-left: 2px solid var(--accent); padding: 6px 12px; margin: 12px 0; font-size: .9rem; }
 .placeholder .chip { margin: 6px 0 4px; text-decoration: none; }
+
+/* ---------- tendencias y resumen semanal */
+.pad-top { padding: 12px 14px 0; margin: 0; }
+.pad-x { padding: 8px 14px 0; }
+.trend-list { padding: 0 14px 0 40px; margin: 8px 0; font-variant-numeric: tabular-nums; }
+.trend-list li { padding: 8px 0; border-top: 1px solid var(--line); }
+.trend-list li::marker { font: 10px var(--font-mono); color: var(--muted); }
+.trend-list .toprow a { text-decoration: none; }
+.week-sec { border-top: 1px solid var(--line); margin-top: 10px; }
+.week-title { margin: 10px 14px 0; font: 10.5px var(--font-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--accent); }
+.findings-head .seg { flex-wrap: wrap; }

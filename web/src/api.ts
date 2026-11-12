@@ -149,6 +149,14 @@ export type CountryProfile =
       temas: { tema: string; nombre: string; dias: number; mejor_puesto: number; ultima_vez: string }[] }
 export type DailyCuriosities = { fecha: string; paises: number; dias_comparados: number; curiosidades: Curiosity[]; nota: string }
 
+export type TrendingItem = { articulo: string; visitas: number; puesto?: number; dias?: number; url: string; tema: string | null }
+export type Trending = { fecha: string; por_idioma: Record<string, TrendingItem[]> }
+export type Weekly = {
+  desde: string; hasta: string; nota: string; tendencias_hasta?: string
+  secciones: { titulo: string; curiosidades: Curiosity[] }[]
+  tendencias: Record<string, TrendingItem[]>
+}
+
 const cache = new Map<string, Promise<unknown>>()
 
 async function get<T>(path: string, useCache = true): Promise<T> {
@@ -209,6 +217,8 @@ export const api = {
       ? getOptional<{ dias: { fecha: string; n: number }[] }>(data('daily/index.json'), { dias: [] })
       : get<{ dias: { fecha: string; n: number }[] }>('/api/curiosidades', false),
   curiosities: (day: string) => get<DailyCuriosities>(STATIC ? data(`daily/${day}.json`) : `/api/curiosidades/${day}`),
+  trending: () => (STATIC ? getOptional<Trending | null>(data('trending.json'), null) : get<Trending>('/api/tendencias').catch(() => null)),
+  weekly: () => (STATIC ? getOptional<Weekly | null>(data('semana.json'), null) : get<Weekly>('/api/semana').catch(() => null)),
   geo: (lod: '110m' | '50m') =>
     get<GeoJSON>(STATIC ? data(lod === '50m' ? 'countries-50m.geojson' : 'countries.geojson') : `/api/geo/${lod}`),
   addTopic: async (body: { nombre: string; titulo?: string; idioma: string; wikidata?: string }) => {

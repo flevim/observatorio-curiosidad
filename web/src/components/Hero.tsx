@@ -52,7 +52,7 @@ export default function Hero({ meta, onTopic, onCountry, onExplore }: Props) {
       </div>
 
       <p className="step">C — {last ? 'Lo curioso, día a día' : 'Hallazgos'}</p>
-      <Findings onTopic={onTopic} onCountry={onCountry} reportAvailable={meta.reporte_disponible} />
+      <Findings onTopic={onTopic} onCountry={onCountry} onExplore={onExplore} reportAvailable={meta.reporte_disponible} />
     </section>
   )
 }

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from urllib.parse import quote
 from pathlib import Path
 
 import httpx
@@ -23,6 +24,7 @@ import pandas as pd
 
 from .analysis import countries as C
 from .analysis import curiosities as Q
+from .analysis import weekly as W
 from .analysis import timeseries as T
 from .analysis.run import ALL, build_series
 from .demo import is_demo
@@ -244,6 +246,9 @@ def export(progress=print) -> None:
         shutil.copy(PATHS.geo_cache / name, out / name)
 
     daily_index: list[dict] = []
+    day_files: list[dict] = []
+    peaks: dict = {}
+    cnames: dict[str, str] = {}
     if tops_path.exists():
         progress("Generando curiosidades por país y por día…")
         geo = json.loads((PATHS.geo_cache / "countries.geojson").read_text(encoding="utf-8"))
@@ -257,7 +262,31 @@ def export(progress=print) -> None:
             if cur:
                 _compact(cur, out / "daily" / f"{d}.json")
                 daily_index.append({"fecha": d, "n": len(cur["curiosidades"])})
+                day_files.append(cur)
         _compact({"dias": sorted(daily_index, key=lambda x: x["fecha"], reverse=True)}, out / "daily" / "index.json")
+
+    # Lo más leído en cada edición (último día publicado) y resumen semanal.
+    trending_path = PATHS.processed / "trending.json"
+    trending = json.loads(trending_path.read_text(encoding="utf-8")) if trending_path.exists() else {}
+    if trending:
+        last = trending["ultimo_dia"]
+        tmap = {(lang, title.replace(" ", "_")): tid for tid, t in topics.items() for lang, title in (t.get("titulos") or {}).items()}
+        _compact({
+            "fecha": last,
+            "por_idioma": {
+                lang: [{**a, "articulo": a["articulo"].replace("_", " "), "tema": tmap.get((lang, a["articulo"])),
+                        "url": f"https://{lang}.wikipedia.org/wiki/{quote(a['articulo'], safe='')}"} for a in days.get(last, [])[:25]]
+                for lang, days in trending["por_idioma"].items()
+            },
+        }, out / "trending.json")
+    if not peaks:
+        peaks = recent_peaks(daily, topics)
+    if not cnames and (PATHS.geo_cache / "countries.geojson").exists():
+        geo = json.loads((PATHS.geo_cache / "countries.geojson").read_text(encoding="utf-8"))
+        cnames = {f["properties"]["iso"]: f["properties"]["nombre"] for f in geo["features"] if f["properties"]["iso"]}
+    weekly = W.build_weekly(daily, topics, day_files, trending, peaks, cnames)
+    if weekly:
+        _compact(weekly, out / "semana.json")
 
     report_path = PATHS.reports / "observatorio.html"
     meta = {

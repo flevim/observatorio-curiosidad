@@ -86,6 +86,11 @@ def fetch(
         totals = src.fetch_project_totals(report)
         totals.to_parquet(PATHS.processed / "project_totals.parquet", index=False)
 
+        progress("Descargando lo más leído en cada edición (últimos 7 días)…")
+        trending = src.fetch_trending(report)
+        if trending:
+            save_json(trending, PATHS.processed / "trending.json")
+
         progress("Descargando relaciones (enlaces, categorías, Wikidata)…")
         relations = src.fetch_relations(resolved_all, report)
         save_json(relations, PATHS.processed / "relations.json")

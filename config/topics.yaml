@@ -42,3 +42,4 @@ temas:
   - {id: futbol, nombre: Fútbol, semilla: {idioma: en, titulo: Association football}}
   - {id: valle-inquietante, nombre: Valle inquietante, semilla: {idioma: es, titulo: Valle inquietante}}
   - {id: black-country-new-road, nombre: 'Black Country, New Road', semilla: {idioma: es, titulo: 'Black Country, New Road'}}
+  - {id: apraxia, nombre: Apraxia, semilla: {idioma: es, titulo: Apraxia}}

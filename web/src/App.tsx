@@ -286,6 +286,7 @@ export default function App() {
           />
           {panel.kind === 'topic' && topic && (
             <TopicPanel
+              topics={meta.temas}
               topicId={topic}
               graph={graph}
               periodLabel={period ? periodLabel(period.id) : ''}

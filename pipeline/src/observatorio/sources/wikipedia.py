@@ -90,6 +90,19 @@ def top_per_country_url(country: str, day: date, access: str = "all-access") -> 
     return f"{PAGEVIEWS}/top-per-country/{country}/{access}/{day.year}/{day.month:02d}/{day.day:02d}"
 
 
+def top_url(lang: str, day: date) -> str:
+    """Artículos más vistos de una edición en un día (visitas de personas)."""
+    return f"{PAGEVIEWS}/top/{lang}.wikipedia/all-access/{day.year}/{day.month:02d}/{day.day:02d}"
+
+
+def parse_top(data: dict | None) -> list[dict]:
+    """JSON del endpoint top -> [{articulo, visitas, puesto}], sin portadas ni páginas especiales."""
+    items = (data or {}).get("items") or []
+    arts = items[0].get("articles", []) if items else []
+    out = [a for a in arts if is_article(a["article"])]
+    return [{"articulo": a["article"], "visitas": int(a["views"]), "puesto": i + 1} for i, a in enumerate(out)]
+
+
 def aggregate_url(lang: str, access: str, start: date, end: date) -> str:
     return (
         f"{PAGEVIEWS}/aggregate/{lang}.wikipedia/{access}/user/monthly/"
@@ -452,6 +465,26 @@ class WikipediaSource(DataSource):
         return out
 
     # ---------------- relaciones semánticas
+
+    def fetch_trending(self, report: FetchReport, days: int = 7, keep: int = 40) -> dict:
+        """Lo más leído en cada edición durante los últimos `days` días publicados."""
+        last = None
+        for back in range(1, 5):  # el día anterior suele publicarse con algunas horas de retraso
+            d = self.today - timedelta(days=back)
+            if self.client.get_json(top_url("en", d), ttl=None, not_found_ttl=6 * 3600).status == 200:
+                last = d
+                break
+        if last is None:
+            report.warn("tendencias: Wikimedia aún no publica los días recientes")
+            return {}
+        por_idioma: dict[str, dict[str, list[dict]]] = {}
+        for lang in self.languages:
+            for i in range(days):
+                d = last - timedelta(days=i)
+                resp = self.client.get_json(top_url(lang, d), ttl=None, not_found_ttl=2 * DAY)
+                if resp.status == 200:
+                    por_idioma.setdefault(lang, {})[d.isoformat()] = parse_top(resp.data)[:keep]
+        return {"ultimo_dia": last.isoformat(), "dias": days, "por_idioma": por_idioma}
 
     def fetch_relations(self, resolved: dict[str, dict], report: FetchReport) -> dict:
         """Enlaces entre artículos (en, es), categorías compartidas y relaciones de Wikidata."""

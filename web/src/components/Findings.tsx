@@ -1,27 +1,33 @@
 import { useEffect, useState } from 'react'
-import { api, reportUrl, type DailyCuriosities, type Finding } from '../api'
+import { api, reportUrl, type DailyCuriosities, type Finding, type Trending, type Weekly } from '../api'
 import { dateLabel, lang } from '../lib/format'
 import CuriosityList from './CuriosityList'
+import TrendingList from './TrendingList'
 
 type Props = {
   onTopic: (id: string) => void
   onCountry: (iso: string) => void
+  onExplore: (q: string) => void
   reportAvailable: boolean
 }
 
-type Tab = 'dia' | 'hallazgos'
+type Tab = 'dia' | 'tendencias' | 'semana' | 'hallazgos'
 
 /** Tarjeta de inicio: curiosidades del día (se renuevan con la actualización diaria) y hallazgos de fondo. */
-export default function Findings({ onTopic, onCountry, reportAvailable }: Props) {
+export default function Findings({ onTopic, onCountry, onExplore, reportAvailable }: Props) {
   const [items, setItems] = useState<Finding[]>([])
   const [days, setDays] = useState<string[]>([])
   const [dayIdx, setDayIdx] = useState(0)
   const [day, setDay] = useState<DailyCuriosities | null>(null)
   const [tab, setTab] = useState<Tab>('dia')
+  const [trending, setTrending] = useState<Trending | null>(null)
+  const [weekly, setWeekly] = useState<Weekly | null>(null)
   const [open, setOpen] = useState(() => window.matchMedia('(min-width: 768px)').matches)
 
   useEffect(() => {
     api.findings().then((f) => setItems(f.sorprendentes), () => setItems([]))
+    api.trending().then(setTrending, () => setTrending(null))
+    api.weekly().then(setWeekly, () => setWeekly(null))
     api.dailyIndex().then(
       (d) => {
         setDays(d.dias.map((x) => x.fecha))
@@ -43,6 +49,16 @@ export default function Findings({ onTopic, onCountry, reportAvailable }: Props)
           {days.length > 0 && (
             <button role="tab" aria-selected={tab === 'dia'} aria-pressed={tab === 'dia'} onClick={() => { setTab('dia'); setOpen(true) }}>
               Del día
+            </button>
+          )}
+          {trending && (
+            <button role="tab" aria-selected={tab === 'tendencias'} aria-pressed={tab === 'tendencias'} onClick={() => { setTab('tendencias'); setOpen(true) }}>
+              Tendencias
+            </button>
+          )}
+          {weekly && (
+            <button role="tab" aria-selected={tab === 'semana'} aria-pressed={tab === 'semana'} onClick={() => { setTab('semana'); setOpen(true) }}>
+              Semana
             </button>
           )}
           <button role="tab" aria-selected={tab === 'hallazgos'} aria-pressed={tab === 'hallazgos'} onClick={() => { setTab('hallazgos'); setOpen(true) }}>
@@ -73,6 +89,36 @@ export default function Findings({ onTopic, onCountry, reportAvailable }: Props)
               </p>
             </>
           ) : <p className="muted pad">Cargando…</p>}
+        </div>
+      )}
+
+      {open && tab === 'tendencias' && trending && (
+        <div id="findings-body" role="tabpanel">
+          <p className="day-title pad-top">Lo más leído en Wikipedia · {dateLabel(trending.fecha)}</p>
+          <TrendingList data={trending.por_idioma} onTopic={onTopic} onExplore={onExplore} />
+          <p className="muted small pad">
+            Artículos más vistos de cada edición ese día (visitas de personas), sin portada ni páginas especiales. Algunas listas
+            incluyen artículos inflados por tráfico automatizado. Un idioma no es un país.
+          </p>
+        </div>
+      )}
+
+      {open && tab === 'semana' && weekly && (
+        <div id="findings-body" role="tabpanel">
+          <p className="day-title pad-top">Semana del {dateLabel(weekly.desde)} al {dateLabel(weekly.hasta)}</p>
+          {weekly.secciones.filter((s) => s.curiosidades.length).map((s) => (
+            <section key={s.titulo} className="week-sec">
+              <p className="week-title">{s.titulo}</p>
+              <CuriosityList items={s.curiosidades} onTopic={onTopic} onCountry={onCountry} />
+            </section>
+          ))}
+          {Object.keys(weekly.tendencias).length > 0 && (
+            <section className="week-sec">
+              <p className="week-title">Lo más leído de la semana</p>
+              <TrendingList data={weekly.tendencias} showDays limit={10} onTopic={onTopic} onExplore={onExplore} />
+            </section>
+          )}
+          <p className="muted small pad">{weekly.nota}</p>
         </div>
       )}
 

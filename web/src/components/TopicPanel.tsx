@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { api, type Graph, type SeriesPayload, type TopicDetail } from '../api'
+import { useEffect, useMemo, useState } from 'react'
+import { api, type Graph, type SeriesPayload, type TopicDetail, type TopicSummary } from '../api'
 import { countryName, dateLabel, lang, MESES, num, pct, wikiUrl } from '../lib/format'
 import RelatedGraph from './RelatedGraph'
 import TimeSeriesChart, { HL_COLORS } from './TimeSeriesChart'
@@ -11,13 +11,14 @@ type Props = {
   onNavigate: (id: string) => void
   onClose: () => void
   onSelectCountry: (iso: string) => void
+  topics: TopicSummary[]
 }
 
 const days = (n: number) => `${num(n, 1)} ${n === 1 ? 'día' : 'días'}`
 
 const trendTxt = { sube: 'sube', baja: 'baja', estable: 'se mantiene' } as const
 
-export default function TopicPanel({ topicId, graph, periodLabel, onNavigate, onClose, onSelectCountry }: Props) {
+export default function TopicPanel({ topicId, graph, periodLabel, onNavigate, onClose, onSelectCountry, topics }: Props) {
   const [t, setT] = useState<TopicDetail | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [daily, setDaily] = useState(false)
@@ -25,6 +26,17 @@ export default function TopicPanel({ topicId, graph, periodLabel, onNavigate, on
   const [log, setLog] = useState(false)
   const [compare, setCompare] = useState<string>('')
   const [peakLang, setPeakLang] = useState('todas')
+  const [cmpId, setCmpId] = useState('')
+  const [cmp, setCmp] = useState<TopicDetail | null>(null)
+  const [cmpLog, setCmpLog] = useState(true)
+
+  useEffect(() => {
+    setCmpId('')
+  }, [topicId])
+  useEffect(() => {
+    if (!cmpId) return setCmp(null)
+    api.topic(cmpId).then(setCmp, () => setCmp(null))
+  }, [cmpId])
 
   useEffect(() => {
     setT(null)
@@ -102,6 +114,18 @@ export default function TopicPanel({ topicId, graph, periodLabel, onNavigate, on
         {t.idiomas_sin_articulo.length > 0 && (
           <p className="muted small">Sin artículo en: {t.idiomas_sin_articulo.map(lang).join(', ')}.</p>
         )}
+      </section>
+
+      <section aria-labelledby="h-comparar">
+        <h3 id="h-comparar">Comparar con otro tema</h3>
+        <label className="check">
+          Tema{' '}
+          <select value={cmpId} onChange={(e) => setCmpId(e.target.value)}>
+            <option value="">—</option>
+            {topics.filter((x) => x.id !== t.id).map((x) => <option key={x.id} value={x.id}>{x.nombre}</option>)}
+          </select>
+        </label>
+        {cmp && <Comparison a={t} b={cmp} log={cmpLog} onLog={setCmpLog} onNavigate={onNavigate} />}
       </section>
 
       <section aria-labelledby="h-resumen">
@@ -240,4 +264,64 @@ export default function TopicPanel({ topicId, graph, periodLabel, onNavigate, on
       </section>
     </div>
   )
+}
+
+
+/** Dos temas en el mismo gráfico (visitas mensuales sumando todos los idiomas) y sus cifras clave lado a lado. */
+function Comparison({ a, b, log, onLog, onNavigate }: {
+  a: TopicDetail; b: TopicDetail; log: boolean; onLog: (v: boolean) => void; onNavigate: (id: string) => void
+}) {
+  const payload: SeriesPayload = useMemoCompare(a, b)
+  const va = a.por_idioma['todas']?.visitas_12m ?? 0
+  const vb = b.por_idioma['todas']?.visitas_12m ?? 0
+  const ta = a.por_idioma['todas']?.tendencia
+  const tb = b.por_idioma['todas']?.tendencia
+  const ratio = va && vb ? (va >= vb ? va / vb : vb / va) : null
+  const mayor = va >= vb ? a.nombre : b.nombre
+  return (
+    <>
+      <p className="source">Visitas mensuales sumando los idiomas analizados · exactas · Wikimedia. No son visitas por país.</p>
+      <div className="controls-row">
+        <label className="check"><input type="checkbox" checked={log} onChange={(e) => onLog(e.target.checked)} /> Escala log</label>
+      </div>
+      <div className="legend-row">
+        <span><i className="sw" style={{ background: HL_COLORS[0] }} />{a.nombre}</span>
+        <span><i className="sw" style={{ background: HL_COLORS[2] }} />{b.nombre}</span>
+      </div>
+      <TimeSeriesChart data={payload} daily={false} highlight={[a.nombre, '', b.nombre]} log={log} label={`Visitas mensuales de ${a.nombre} y ${b.nombre}`} />
+      <div className="scroll">
+        <table>
+          <thead><tr><th></th><th className="n">{a.nombre}</th><th className="n">{b.nombre}</th></tr></thead>
+          <tbody>
+            <tr><td>Visitas 12 meses</td><td className="n">{num(va)}</td><td className="n">{num(vb)}</td></tr>
+            <tr><td>Tendencia</td>
+              <td className="n">{ta ? `${trendTxt[ta.clase]} (${ta.cambio_anual >= 0 ? '+' : '−'}${pct(Math.abs(ta.cambio_anual))}/año)` : '—'}</td>
+              <td className="n">{tb ? `${trendTxt[tb.clase]} (${tb.cambio_anual >= 0 ? '+' : '−'}${pct(Math.abs(tb.cambio_anual))}/año)` : '—'}</td></tr>
+            <tr><td>Picos detectados</td><td className="n">{a.por_idioma['todas']?.n_picos ?? 0}</td><td className="n">{b.por_idioma['todas']?.n_picos ?? 0}</td></tr>
+          </tbody>
+        </table>
+      </div>
+      {ratio && <p className="muted small">En los últimos 12 meses, «{mayor}» tuvo {num(ratio, 1)} veces más visitas.</p>}
+      <button className="link" onClick={() => onNavigate(b.id)}>Ir a «{b.nombre}»</button>
+    </>
+  )
+}
+
+function useMemoCompare(a: TopicDetail, b: TopicDetail): SeriesPayload {
+  return useMemo(() => {
+    const toMap = (t: TopicDetail) => {
+      const m = new Map<string, number | null>()
+      const f = t.mensual.fechas ?? []
+      f.forEach((d, i) => m.set(d, t.mensual.series['todas']?.[i] ?? null))
+      return m
+    }
+    const ma = toMap(a)
+    const mb = toMap(b)
+    const fechas = [...new Set([...ma.keys(), ...mb.keys()])].sort()
+    return {
+      inicio: fechas[0],
+      fechas,
+      series: { [a.nombre]: fechas.map((d) => ma.get(d) ?? null), [b.nombre]: fechas.map((d) => mb.get(d) ?? null) },
+    }
+  }, [a, b])
 }
