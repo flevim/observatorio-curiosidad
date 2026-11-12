@@ -153,7 +153,7 @@ const cache = new Map<string, Promise<unknown>>()
 
 async function get<T>(path: string, useCache = true): Promise<T> {
   if (useCache && cache.has(path)) return cache.get(path) as Promise<T>
-  const p = fetch(path).then(async (r) => {
+  const p = fetch(api_(path)).then(async (r) => {
     if (!r.ok) {
       const body = await r.json().catch(() => ({}))
       throw new Error(body.detail ?? `Error ${r.status} en ${path}`)
@@ -170,9 +170,12 @@ async function get<T>(path: string, useCache = true): Promise<T> {
  * los JSON exportados, copiados en `<base>/data/`. Mismos datos que sirve la API, sin «Agregar tema».
  */
 export const STATIC = import.meta.env.VITE_STATIC === '1'
+/** Dirección de la API en un servidor propio (VITE_API_BASE, p. ej. https://api.midominio.org). Vacía = mismo origen. */
+export const API_BASE: string = (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, '') ?? ''
+const api_ = (path: string) => (path.startsWith('/api') ? `${API_BASE}${path}` : path)
 const BASE = import.meta.env.BASE_URL
 const data = (file: string) => `${BASE}data/${file}`
-export const reportUrl = STATIC ? `${BASE}reporte.html` : '/reporte'
+export const reportUrl = STATIC ? `${BASE}reporte.html` : `${API_BASE}/reporte`
 
 async function getOptional<T>(path: string, fallback: T): Promise<T> {
   try {
@@ -209,7 +212,7 @@ export const api = {
   geo: (lod: '110m' | '50m') =>
     get<GeoJSON>(STATIC ? data(lod === '50m' ? 'countries-50m.geojson' : 'countries.geojson') : `/api/geo/${lod}`),
   addTopic: async (body: { nombre: string; titulo?: string; idioma: string; wikidata?: string }) => {
-    const r = await fetch('/api/topics', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const r = await fetch(`${API_BASE}/api/topics`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const data = await r.json()
     if (!r.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'No se pudo agregar el tema')
     return data as { job: string; tema: string }

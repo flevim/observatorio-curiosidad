@@ -1,0 +1,10 @@
+[Unit]
+Description=Observatorio de la Curiosidad: programación de la actualización diaria
+
+[Timer]
+# 13:00 UTC, todos los días (10:00 en Chile en horario de verano, 09:00 en invierno).
+OnCalendar=*-*-* 13:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

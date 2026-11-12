@@ -1,0 +1,12 @@
+[Unit]
+Description=Observatorio de la Curiosidad: actualización diaria
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/observatorio-curiosidad
+EnvironmentFile=/home/ubuntu/observatorio-curiosidad/.env
+# flock: la API y la actualización no escriben los datos a la vez (mismo archivo de bloqueo).
+ExecStart=/usr/bin/flock /home/ubuntu/observatorio-curiosidad/data/.lock /home/ubuntu/observatorio-curiosidad/.venv/bin/python -m observatorio daily
+TimeoutStartSec=6h

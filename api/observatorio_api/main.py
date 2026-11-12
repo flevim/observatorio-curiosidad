@@ -10,6 +10,7 @@ Ejecutar:  uvicorn observatorio_api.main:app --app-dir api --port 8010
 from __future__ import annotations
 
 import json
+import os
 import re
 import threading
 import unicodedata
@@ -18,6 +19,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -27,6 +29,11 @@ from observatorio.settings import PATHS, SLUG_RE, TopicConfig, append_topic, con
 
 app = FastAPI(title="Observatorio de la Curiosidad", version="0.1.0")
 app.add_middleware(GZipMiddleware, minimum_size=1024)
+
+# CORS: la web publicada (GitHub Pages) llama a esta API desde otro origen.
+_cors = [o.strip() for o in os.environ.get("OBSERVATORIO_CORS_ORIGINS", "").split(",") if o.strip()]
+if _cors:
+    app.add_middleware(CORSMiddleware, allow_origins=_cors, allow_methods=["GET", "POST"], allow_headers=["Content-Type"])
 
 PERIOD_RE = re.compile(r"^\d{4}-\d{2}(-\d{2})?$")
 ISO_RE = re.compile(r"^[A-Z]{2}$")

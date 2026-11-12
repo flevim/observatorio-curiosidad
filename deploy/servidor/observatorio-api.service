@@ -1,0 +1,16 @@
+[Unit]
+Description=Observatorio de la Curiosidad: API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/observatorio-curiosidad
+EnvironmentFile=/home/ubuntu/observatorio-curiosidad/.env
+ExecStart=/home/ubuntu/observatorio-curiosidad/.venv/bin/python -m uvicorn observatorio_api.main:app --app-dir api --host 127.0.0.1 --port 8010
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
