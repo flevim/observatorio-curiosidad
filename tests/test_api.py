@@ -36,3 +36,20 @@ def test_country_without_data_is_flagged():
     period = meta["periodos"][0]["id"]
     r = client.get(f"/api/countries/{period}/AQ").json()  # Antártida: nunca hay ranking
     assert r["sin_datos"] is True
+
+
+def test_add_topic_rate_limit_per_ip(monkeypatch):
+    import observatorio_api.main as m
+    from fastapi import HTTPException
+
+    class Req:
+        headers = {"cf-connecting-ip": "203.0.113.7"}
+        client = None
+
+    monkeypatch.setattr(m, "_added", [])
+    monkeypatch.setattr(m, "LIMITE_POR_HORA", 2)
+    m._check_limits(Req())
+    m._check_limits(Req())
+    with pytest.raises(HTTPException) as e:
+        m._check_limits(Req())
+    assert e.value.status_code == 429

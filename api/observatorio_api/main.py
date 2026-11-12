@@ -13,6 +13,7 @@ import json
 import os
 import re
 import threading
+import time
 import unicodedata
 import uuid
 from functools import lru_cache
@@ -248,8 +249,39 @@ def _run_job(job_id: str, tid: str) -> None:
         job["error"] = str(exc)
 
 
+# Límites para que cualquier visitante pueda agregar temas sin saturar el sistema ni a Wikimedia.
+LIMITE_POR_HORA = int(os.environ.get("OBSERVATORIO_LIMITE_TEMAS_HORA", "3"))   # por visitante (IP)
+LIMITE_POR_DIA = int(os.environ.get("OBSERVATORIO_LIMITE_TEMAS_DIA", "30"))    # en total
+MAX_TEMAS = int(os.environ.get("OBSERVATORIO_MAX_TEMAS", "300"))               # tamaño máximo del observatorio
+MAX_EN_COLA = int(os.environ.get("OBSERVATORIO_MAX_EN_COLA", "5"))
+_added: list[tuple[float, str]] = []  # (momento, ip)
+_limits_lock = threading.Lock()
+
+
+def _client_ip(request: Request) -> str:
+    # Detrás del túnel de Cloudflare, la IP real viene en CF-Connecting-IP.
+    return request.headers.get("cf-connecting-ip") or (request.client.host if request.client else "desconocida")
+
+
+def _check_limits(request: Request) -> None:
+    now = time.time()
+    ip = _client_ip(request)
+    with _limits_lock:
+        _added[:] = [(t, i) for t, i in _added if now - t < 86400]
+        if sum(1 for t, i in _added if i == ip and now - t < 3600) >= LIMITE_POR_HORA:
+            raise HTTPException(429, f"Puedes agregar hasta {LIMITE_POR_HORA} temas por hora. Intenta más tarde.")
+        if len(_added) >= LIMITE_POR_DIA:
+            raise HTTPException(429, "Se alcanzó el máximo de temas nuevos por hoy. Intenta mañana.")
+        if sum(1 for j in JOBS.values() if j["estado"] not in ("listo", "error")) >= MAX_EN_COLA:
+            raise HTTPException(429, "Hay varios temas procesándose. Intenta en unos minutos.")
+        if len(load_topics().topics) >= MAX_TEMAS:
+            raise HTTPException(409, f"El observatorio llegó a su máximo de {MAX_TEMAS} temas.")
+        _added.append((now, ip))
+
+
 @app.post("/api/topics", status_code=202)
-def add_topic(body: NewTopic):
+def add_topic(body: NewTopic, request: Request):
+    _check_limits(request)
     if not contact():
         raise HTTPException(503, "Falta OBSERVATORIO_CONTACT en .env: Wikimedia exige un contacto en el User-Agent para descargar datos.")
     if not body.titulo and not body.wikidata:
