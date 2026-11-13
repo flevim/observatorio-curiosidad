@@ -77,3 +77,43 @@ def test_protections_are_copied_verbatim():
     out = D.protections_in(log, HS)
     assert out == [{"fecha": "2026-11-10 21:03", "accion": "cambio de protección", "nivel": "[edit=autoconfirmed]",
                     "motivo": "Persistent [[WP:Vandalism|vandalism]]"}]
+
+
+def test_web_rules_match_python(tmp_path):
+    """La web recalcula «Bajo disputa» en el navegador: sus reglas (TypeScript) deben dar los mismos números."""
+    import json
+    import shutil
+    import subprocess
+    from pathlib import Path
+
+    import pytest
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node no está instalado")
+    root = Path(__file__).resolve().parents[1]
+    body = ('<td class="diff-deletedline"><div>un <del class="diffchange diffchange-inline">abogado</del></div></td>'
+            '<td class="diff-addedline"><div>un <ins class="diffchange diffchange-inline">neonazi &amp; «más»</ins></div></td>'
+            '<td class="diff-addedline"><div>[[Categoría:Nueva]]</div></td>')
+    revs = history(base_reverted=3, week_reverted=12)
+    revs += [rev(400 + i, f"2026-11-10T0{i}:15:00Z", reverted=True, user="10.0.0.1", anon=True, comment="/* Ficha */") for i in range(5)]
+    revs.sort(key=lambda r: r["timestamp"])
+    log = [{"timestamp": "2026-11-10T21:03:00Z", "action": "move_prot", "comment": "Persistent [[WP:Vandalism|vandalism]]",
+            "params": {"description": "\u200e[edit=autoconfirmed]"}}]
+    case = {"revs": revs, "inicio": WS.isoformat(), "fin": WE.isoformat(), "completo": True, "desde": HS.isoformat(),
+            "diffs": {str(100 + i): body for i in range(6)} | {"400": body}, "log": log}
+    f = tmp_path / "caso.json"
+    f.write_text(json.dumps(case, ensure_ascii=False), encoding="utf-8")
+    out = subprocess.run([node, str(root / "tests/js/disputa_paridad.ts"), str(f)], capture_output=True, text=True,
+                         encoding="utf-8", check=True)
+    js = json.loads(out.stdout)
+
+    py_score = D.score_article(revs, WS, WE, True, HS)
+    py_score.pop("entra"), js["score"].pop("entra")
+    assert js["score"] == py_score
+    py_days = D.disputed_days(revs, WS, WE, py_score["habitual_por_dia"], top=5)
+    assert len(py_days) == 2 and js["days"] == py_days
+    diffs = {int(k): D.parse_diff(v) for k, v in case["diffs"].items()}
+    py_desc = [D.describe_day(d, [r for r in revs if r["timestamp"].startswith(d)], diffs, "es") for d in py_days]
+    assert js["describe"] == json.loads(json.dumps(py_desc))
+    assert js["protecciones"] == D.protections_in(log, HS)

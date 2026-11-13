@@ -1,6 +1,20 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DisputeArticle, Disputes } from '../api'
 import { dateLabel, lang, num } from '../lib/format'
+import { analyzeArticle, MAX_DAYS, type LiveResult } from '../lib/disputeLive'
+import { addDays } from '../lib/disputeRules'
+import { LANGS, searchWikipedia } from '../lib/wikipedia'
+
+/** Casos mediáticos para probar: artículo, idioma y un período alrededor del momento clave. */
+const EJEMPLOS = [
+  { lang: 'es', titulo: 'Elección presidencial de Chile de 2025', inicio: '2025-09-01', fin: '2026-01-31' },
+  { lang: 'es', titulo: 'José Antonio Kast', inicio: '2025-09-01', fin: '2026-01-31' },
+  { lang: 'es', titulo: 'Jeannette Jara', inicio: '2025-09-01', fin: '2026-01-31' },
+  { lang: 'en', titulo: '2024 United States presidential election', inicio: '2024-07-01', fin: '2024-12-31' },
+  { lang: 'en', titulo: 'Kamala Harris', inicio: '2024-07-01', fin: '2024-12-31' },
+  { lang: 'en', titulo: '2020 United States presidential election', inicio: '2020-10-01', fin: '2021-01-31' },
+]
+const yesterday = () => addDays(new Date().toISOString().slice(0, 10), -1)
 
 const fmtDay = (iso: string) => dateLabel(iso.slice(0, 10))
 const veces = (a: DisputeArticle) =>
@@ -13,10 +27,15 @@ export default function DisputeView({ data }: { data: Disputes }) {
   const items = useMemo(() => data.articulos.filter((a) => filter === 'todos' || a.idioma === filter), [data, filter])
   const ranked = items.filter((a) => !a.nuevo)
   const nuevos = items.filter((a) => a.nuevo)
+  const [live, setLive] = useState<LiveResult | null>(null)
   const sel = items.find((a) => a.id === selId) ?? ranked[0] ?? nuevos[0] ?? null
   const langs = data.idiomas.filter((l) => data.articulos.some((a) => a.idioma === l))
 
+  const toDetail = () => {
+    if (window.matchMedia('(max-width: 767px)').matches) document.getElementById('disp-detail')?.scrollIntoView({ block: 'start' })
+  }
   const pick = (a: DisputeArticle) => {
+    setLive(null)
     setSelId(a.id)
     if (window.matchMedia('(max-width: 767px)').matches) document.getElementById('disp-detail')?.scrollIntoView({ block: 'start' })
   }
@@ -35,6 +54,8 @@ export default function DisputeView({ data }: { data: Disputes }) {
         <p className="kicker"><span className="rule" aria-hidden="true" />Semana del {fmtDay(data.semana.inicio)} al {fmtDay(data.semana.fin)} · UTC</p>
         <h2 id="disp-title" className="prop-side-title">Bajo <em>disputa</em></h2>
         <p className="hero-lede">Artículos de Wikipedia con muchas más ediciones revertidas de lo habitual. Todo sale de datos públicos y cada número enlaza a su fuente.</p>
+        <LiveSearch onResult={(r) => { setLive(r); toDetail() }} />
+        <h3 className="disp-sub">Ranking de la semana</h3>
         <div className="seg disp-langs" role="group" aria-label="Idioma">
           {['todos', ...langs].map((l) => (
             <button key={l} aria-pressed={filter === l} onClick={() => setFilter(l)}>{l === 'todos' ? 'Todos' : l}</button>
@@ -54,7 +75,7 @@ export default function DisputeView({ data }: { data: Disputes }) {
           <ul>
             <li>Una edición <b>revertida</b> es la que Wikipedia marcó después con la etiqueta <code>mw-reverted</code>: alguien la deshizo.</li>
             <li>Candidatos: los {data.reglas.candidatos_por_idioma} artículos con más ediciones revertidas en la semana (sin bots) en cada idioma: {data.idiomas.join(', ')}.</li>
-            <li><b>Lo habitual</b> = ediciones revertidas por día en los días anteriores a la semana (hasta 83). Esperadas = 7 × lo habitual.</li>
+            <li><b>Lo habitual</b> = ediciones revertidas por día en los días anteriores a la semana (hasta 83). Esperadas = 7 × lo habitual. En «Revisar un artículo», lo habitual son los 90 días anteriores al período elegido y las esperadas se multiplican por los días del período.</li>
             <li>Entra al ranking si tuvo al menos {data.reglas.min_revertidas} revertidas, al menos el triple de las esperadas y un puntaje ≥ {num(data.reglas.min_puntaje, 0)}. Puntaje = (observadas − esperadas) / √(esperadas + 1).</li>
             <li><b>Día en disputa</b>: ≥ 3 revertidas y ≥ 3 × lo habitual + 2.</li>
             <li><b>Entraba / salía</b>: texto que las ediciones revertidas agregaban o quitaban, copiado tal cual del diff de hasta {data.reglas.diffs_por_dia} ediciones por día. Se cuentan repeticiones exactas.</li>
@@ -66,13 +87,102 @@ export default function DisputeView({ data }: { data: Disputes }) {
       </section>
 
       <section id="disp-detail" className="disp-detail" aria-live="polite">
-        {sel ? <Detail a={sel} semana={data.semana} /> : <p className="hint">Sin artículos para mostrar.</p>}
+        {live ? (
+          <>
+            <p className="disp-live-head">
+              <span>Tu búsqueda · calculado en vivo con datos de Wikipedia</span>
+              <button className="link" onClick={() => setLive(null)}>Volver al ranking</button>
+            </p>
+            {live.cortado && <p className="muted small">El artículo tiene tantas ediciones que el historial se cortó en las 20.000 más recientes: lo habitual se calcula con lo descargado.</p>}
+            <Detail a={live} semana={live.periodo} protLabel="Protecciones en el período y los 90 días anteriores" />
+          </>
+        ) : sel ? <Detail a={sel} semana={data.semana} /> : <p className="hint">Sin artículos para mostrar.</p>}
       </section>
     </div>
   )
 }
 
-function Detail({ a, semana }: { a: DisputeArticle; semana: Disputes['semana'] }) {
+function LiveSearch({ onResult }: { onResult: (r: LiveResult) => void }) {
+  const [lng, setLng] = useState('es')
+  const [q, setQ] = useState('')
+  const [hits, setHits] = useState<string[]>([])
+  const [mode, setMode] = useState<'90' | 'fechas'>('90')
+  const [start, setStart] = useState(addDays(yesterday(), -89))
+  const [end, setEnd] = useState(yesterday())
+  const [busy, setBusy] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const typed = useRef(false)
+
+  useEffect(() => {
+    if (!typed.current || q.trim().length < 2) { setHits([]); return }
+    const t = setTimeout(() => {
+      searchWikipedia(lng, q.trim()).then((h) => setHits(h.slice(0, 6).map((x) => x.title)), () => setHits([]))
+    }, 350)
+    return () => clearTimeout(t)
+  }, [q, lng])
+
+  const run = async (title: string, l = lng, s0 = mode === '90' ? addDays(yesterday(), -89) : start, e0 = mode === '90' ? yesterday() : end) => {
+    if (!title.trim()) { setError('Escribe el nombre de un artículo.'); return }
+    if (s0 > e0) { setError('La fecha de inicio debe ser anterior a la de término.'); return }
+    if ((Date.parse(e0) - Date.parse(s0)) / 86400000 + 1 > MAX_DAYS) { setError(`El período puede durar hasta ${MAX_DAYS} días.`); return }
+    if (e0 > yesterday()) { setError('El período debe terminar a más tardar ayer.'); return }
+    setError(null); setHits([]); typed.current = false
+    try {
+      onResult(await analyzeArticle(l, title.trim(), s0, e0, setBusy))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo consultar Wikipedia.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <form className="disp-search" onSubmit={(e) => { e.preventDefault(); run(q) }} aria-label="Revisar un artículo">
+      <h3 className="disp-sub">Revisar un artículo</h3>
+      <div className="disp-search-row">
+        <label className="sr-only" htmlFor="disp-lang">Idioma</label>
+        <select id="disp-lang" value={lng} onChange={(e) => setLng(e.target.value)}>
+          {LANGS.map((l) => <option key={l} value={l}>{l}</option>)}
+        </select>
+        <label className="sr-only" htmlFor="disp-q">Artículo de Wikipedia</label>
+        <input id="disp-q" type="search" placeholder="Artículo de Wikipedia" value={q} autoComplete="off"
+          onChange={(e) => { typed.current = true; setQ(e.target.value) }} />
+      </div>
+      {hits.length > 0 && (
+        <ul className="disp-hits" aria-label="Sugerencias">
+          {hits.map((h) => <li key={h}><button type="button" className="link" onClick={() => { setQ(h); run(h) }}>{h}</button></li>)}
+        </ul>
+      )}
+      <div className="seg disp-period" role="group" aria-label="Período">
+        <button type="button" aria-pressed={mode === '90'} onClick={() => setMode('90')}>Últimos 90 días</button>
+        <button type="button" aria-pressed={mode === 'fechas'} onClick={() => setMode('fechas')}>Elegir fechas</button>
+      </div>
+      {mode === 'fechas' && (
+        <div className="disp-dates">
+          <label>Desde <input type="date" value={start} min="2001-01-15" max={yesterday()} onChange={(e) => setStart(e.target.value)} /></label>
+          <label>Hasta <input type="date" value={end} min="2001-01-15" max={yesterday()} onChange={(e) => setEnd(e.target.value)} /></label>
+        </div>
+      )}
+      <button type="submit" className="ghost disp-go" disabled={!!busy}>{busy ? 'Revisando…' : 'Revisar'}</button>
+      {busy && <p className="muted small" role="status">{busy}</p>}
+      {error && <p className="disp-error" role="alert">{error}</p>}
+      <p className="disp-ex-h">Casos mediáticos</p>
+      <ul className="disp-ex">
+        {EJEMPLOS.map((x) => (
+          <li key={x.titulo}>
+            <button type="button" className="link" disabled={!!busy} onClick={() => {
+              setLng(x.lang); setQ(x.titulo); setMode('fechas'); setStart(x.inicio); setEnd(x.fin); run(x.titulo, x.lang, x.inicio, x.fin)
+            }}>{x.titulo}</button>
+            <span className="muted"> · {x.lang} · {x.inicio.slice(0, 7)} a {x.fin.slice(0, 7)}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="muted small">Se calcula en tu navegador con las mismas reglas del ranking, comparando el período con los 90 días anteriores. Un artículo muy editado puede tardar unos segundos.</p>
+    </form>
+  )
+}
+
+function Detail({ a, semana, protLabel = 'Protecciones en los últimos 90 días' }: { a: DisputeArticle; semana: Disputes['semana']; protLabel?: string }) {
   return (
     <article className="disp-article">
       <div className="disp-a">
@@ -86,7 +196,7 @@ function Detail({ a, semana }: { a: DisputeArticle; semana: Disputes['semana'] }
 
       <Chart a={a} semana={semana} />
 
-      <h3>Protecciones en los últimos 90 días</h3>
+      <h3>{protLabel}</h3>
       {a.protecciones.length === 0 ? <p className="muted">Ninguna.</p> : (
         <ul className="disp-prot">
           {a.protecciones.map((p, i) => (
@@ -185,8 +295,8 @@ function Chart({ a, semana }: { a: DisputeArticle; semana: Disputes['semana'] })
         <span><i className="sw ed" />edición que se quedó</span>
         <span><i className="sw rev" />revertida después</span>
         <span><i className="sw prot" />protección</span>
-        <span><i className="sw week" />semana analizada</span>
-        <span className="muted">Visitas en 90 días: {num(totalViews)} · escala raíz</span>
+        <span><i className="sw week" />período analizado</span>
+        <span className="muted">Visitas en el gráfico: {num(totalViews)} · escala raíz</span>
       </figcaption>
     </figure>
   )

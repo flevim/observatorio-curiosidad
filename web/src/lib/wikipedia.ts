@@ -21,7 +21,7 @@ export type ArticleSummary = {
 const cache = new Map<string, Promise<unknown>>()
 let queue: Promise<unknown> = Promise.resolve()
 
-function getJson<T>(url: string): Promise<T> {
+export function getJson<T>(url: string): Promise<T> {
   if (cache.has(url)) return cache.get(url) as Promise<T>
   // En serie: cada petición espera a la anterior (lo que pide la política de uso de Wikimedia).
   const p = queue.then(async () => {
@@ -36,14 +36,14 @@ function getJson<T>(url: string): Promise<T> {
   return p
 }
 
-const action = (lang: string, params: Record<string, string>) =>
+export const action = (lang: string, params: Record<string, string>) =>
   `https://${lang}.wikipedia.org/w/api.php?` +
   new URLSearchParams({ format: 'json', formatversion: '2', origin: '*', ...params }).toString()
 
 /** HTML de Wikipedia (fragmentos con <span> y entidades &#039;) a texto plano, sin ejecutar nada. */
 const plainText = (html: string) => new DOMParser().parseFromString(html, 'text/html').documentElement.textContent ?? ''
 
-const enc = (title: string) => encodeURIComponent(title.replace(/ /g, '_'))
+export const enc = (title: string) => encodeURIComponent(title.replace(/ /g, '_'))
 
 export async function searchWikipedia(lang: string, q: string): Promise<SearchHit[]> {
   const data = await getJson<{ query?: { search: { title: string; snippet: string }[] } }>(

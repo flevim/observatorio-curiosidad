@@ -92,7 +92,7 @@ def score_article(revs: list[dict], week_start: date, week_end: date, history_co
         first = max(first, date.fromisoformat(created))
     base_days = max(0, (week_start - first).days)
     habitual = (sum(map(is_reverted, before)) / base_days) if base_days else None
-    expected = 7 * habitual if habitual is not None else 0.0
+    expected = ((week_end - week_start).days + 1) * habitual if habitual is not None else 0.0
     score = (obs - expected) / math.sqrt(expected + 1)
     return {
         "revertidas_semana": obs,
