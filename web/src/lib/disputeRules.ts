@@ -9,10 +9,10 @@ const SECTION_RE = /\/\*\s*(.+?)\s*\*\//g
 const FRAG_MAX = 220
 
 export type Rev = {
-  revid: number; parentid?: number; timestamp: string; user?: string; tags?: string[]; comment?: string
+  revid: number; parentid?: number; timestamp: string; user?: string; tags?: string[]; comment?: string; size?: number
   anon?: boolean; temp?: boolean
 }
-export type Frag = { texto: string; veces: number }
+export type Frag = { texto: string; veces: number; hoy?: boolean; contexto?: string }
 export type Score = {
   revertidas_semana: number; ediciones_semana: number; habitual_por_dia: number | null; dias_comparados: number
   esperadas_semana: number; veces: number | null; puntaje: number; creado: string | null; nuevo: boolean; entra: boolean
@@ -20,7 +20,10 @@ export type Score = {
 export type Day = {
   dia: string; ediciones: number; revertidas: number; reversiones: number; minutos: number; editores: number; sin_cuenta: number
   secciones: { seccion: string; ediciones: number }[]; entraba: Frag[]; salia: Frag[]; diffs_revisados: number
-  frases: string[]; enlaces: { hora: string; url: string }[]
+  frases: string[]; enlaces: Edit[]
+}
+export type Edit = {
+  hora: string; url: string; revid: number; parentid: number; comentario: string; sin_cuenta: boolean; bytes: number | null
 }
 
 const day = (ts: string) => ts.slice(0, 10)
@@ -141,7 +144,7 @@ function span(minutes: number): string {
   return h >= 3 ? `${h.toFixed(0)} h` : `${n1(h)} h`
 }
 
-export function describeDay(d: string, revsDay: Rev[], diffs: Map<number, [string[], string[]]>, lang: string): Day {
+export function describeDay(d: string, revsDay: Rev[], diffs: Map<number, [string[], string[]]>, lang: string, sizes: Map<number, number> = new Map()): Day {
   const reverted = revsDay.filter(isReverted)
   const times = reverted.map((r) => Date.parse(r.timestamp)).sort((a, b) => a - b)
   const minutes = times.length > 1 ? Math.floor((times[times.length - 1] - times[0]) / 60000) : 0
@@ -168,7 +171,65 @@ export function describeDay(d: string, revsDay: Rev[], diffs: Map<number, [strin
     editores: editors.size, sin_cuenta: anon.size,
     secciones: sections.map(([seccion, ediciones]) => ({ seccion, ediciones })),
     entraba: ent, salia: sal, diffs_revisados: revisadas, frases,
-    enlaces: reverted.slice(0, 20).map((r) => ({ hora: r.timestamp.slice(11, 16), url: diffUrl(lang, r) })),
+    enlaces: reverted.slice(0, 20).map((r) => editEntry(r, lang, sizes)),
+  }
+}
+
+/** Una edición revertida, con lo necesario para verla dentro del sitio (el diff se pide aparte por revid). */
+export function editEntry(r: Rev, lang: string, sizes: Map<number, number>): Edit {
+  const parent = sizes.get(r.parentid ?? 0)
+  return {
+    hora: r.timestamp.slice(11, 16), url: diffUrl(lang, r), revid: r.revid, parentid: r.parentid ?? 0,
+    comentario: r.comment ?? '', sin_cuenta: isAnonymous(r),
+    bytes: parent === undefined || r.size == null ? null : r.size - parent,
+  }
+}
+
+export const sizesOf = (revs: Rev[]) => new Map(revs.filter((r) => r.size != null).map((r) => [r.revid, r.size!]))
+
+// ---------------- ¿qué quedó al final?
+
+const norm = (s: string) => (s ?? '').replace(/\s+/g, ' ').trim()
+
+/** Marca cada fragmento disputado con si está hoy en el texto del artículo y, si está, su contexto. */
+export function markCurrent(d: Day, wikitext: string): void {
+  const text = norm(wikitext)
+  for (const f of [...d.entraba, ...d.salia]) {
+    const key = f.texto.endsWith('…') ? f.texto.slice(0, -1) : f.texto
+    if ([...key].length < 8) continue // «ref» o «<center>» aparecen en cualquier artículo: no dicen nada
+    const i = text.indexOf(key)
+    f.hoy = i >= 0
+    if (i >= 0) {
+      const a = Math.max(0, i - 90), b = Math.min(text.length, i + key.length + 90)
+      f.contexto = (a ? '…' : '') + text.slice(a, b) + (b < text.length ? '…' : '')
+    }
+  }
+}
+
+// ---------------- ¿la disputa vino antes o después del pico de lectura?
+
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+export const fecha = (iso: string) => { const [y, m, d] = iso.split('-'); return `${Number(d)} de ${MESES[Number(m) - 1]} de ${y}` }
+const miles = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+
+export type Peak = { visitas: { dia: string; n: number }; revertidas: { dia: string; n: number }; desfase: number; frase: string }
+
+/** Día con más visitas y día con más ediciones revertidas dentro del período (empates: el primero). */
+export function peakVsDispute(serie: [string, number, number, number | null][], start: string, end: string): Peak | null {
+  const days = serie.filter((s) => start <= s[0] && s[0] <= end)
+  const withViews = days.filter((s) => s[3] !== null)
+  if (!withViews.length || !days.some((s) => s[2])) return null
+  const pv = withViews.reduce((a, b) => (b[3]! > a[3]! ? b : a))
+  const pr = days.reduce((a, b) => (b[2] > a[2] ? b : a))
+  const gap = daysBetween(pr[0], pv[0])
+  const rel = gap === 0 ? 'el mismo día del pico de lectura'
+    : `${Math.abs(gap)} ${Math.abs(gap) === 1 ? 'día' : 'días'} ${gap > 0 ? 'después' : 'antes'} del pico de lectura`
+  return {
+    visitas: { dia: pv[0], n: pv[3]! },
+    revertidas: { dia: pr[0], n: pr[2] },
+    desfase: gap,
+    frase: `El día con más visitas del período fue el ${fecha(pv[0])} (${miles(pv[3]!)} visitas). ` +
+      `El día con más ediciones revertidas fue el ${fecha(pr[0])} (${pr[2]}): ${rel}.`,
   }
 }
 

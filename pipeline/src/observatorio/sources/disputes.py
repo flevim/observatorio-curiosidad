@@ -84,6 +84,18 @@ def views(client: PoliteClient, lang: str, title: str, start: date, end: date) -
     return {f"{i['timestamp'][:4]}-{i['timestamp'][4:6]}-{i['timestamp'][6:8]}": i["views"] for i in r.data.get("items", [])}
 
 
+def current_version(client: PoliteClient, lang: str, title: str) -> dict | None:
+    """Texto actual (wikitexto) del artículo, para ver qué quedó de lo disputado."""
+    d = _q(client, lang, {"action": "query", "prop": "revisions", "titles": title, "rvprop": "ids|timestamp|content",
+                           "rvslots": "main", "rvlimit": 1}, ttl=6 * 3600)
+    revs = ((d.get("query") or {}).get("pages") or [{}])[0].get("revisions") or []
+    if not revs:
+        return None
+    r = revs[0]
+    return {"revid": r["revid"], "fecha": r["timestamp"][:16].replace("T", " "),
+            "texto": ((r.get("slots") or {}).get("main") or {}).get("content", "")}
+
+
 def diff(client: PoliteClient, lang: str, rev: dict) -> tuple[list[str], list[str]] | None:
     if not rev.get("parentid"):
         return None
@@ -125,6 +137,13 @@ def fetch_disputes(client: PoliteClient, progress: Callable[[str], None] = lambd
                             diffs[r["revid"]] = got
             log = protection_log(client, lang, title)
             vw = views(client, lang, title, hist_start, week_end)
+            sizes = D.sizes_of(revs)
+            described = [D.describe_day(d, by_day[d], diffs, lang, sizes) for d in days]
+            cur = current_version(client, lang, title) if any(d["entraba"] or d["salia"] for d in described) else None
+            if cur:
+                for d in described:
+                    D.mark_current(d, cur["texto"])
+            serie = D.series(revs, vw, hist_start, week_end)
             articles.append({
                 "id": f"{lang}:{title}",
                 "titulo": title,
@@ -135,9 +154,11 @@ def fetch_disputes(client: PoliteClient, progress: Callable[[str], None] = lambd
                 **s,
                 "historial_completo": full,
                 "resumen": D.summary_sentence(s),
-                "dias_disputa": [D.describe_day(d, by_day[d], diffs, lang) for d in days],
+                "dias_disputa": described,
+                "version_actual": None if not cur else {"revid": cur["revid"], "fecha": cur["fecha"]},
+                "pico": D.peak_vs_dispute(serie, week_start.isoformat(), week_end.isoformat()),
                 "protecciones": D.protections_in(log, hist_start),
-                "serie": D.series(revs, vw, hist_start, week_end),
+                "serie": serie,
             })
     articles.sort(key=lambda a: -a["puntaje"])
     return {

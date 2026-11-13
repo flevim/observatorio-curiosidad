@@ -62,6 +62,14 @@ async function views(lang: string, title: string, from: string, to: string): Pro
   }
 }
 
+/** Texto actual (wikitexto) del artículo, para ver qué quedó de lo disputado. */
+async function currentVersion(lang: string, title: string): Promise<{ revid: number; fecha: string; texto: string } | null> {
+  const d = await getJson<Query<{ pages?: { revisions?: { revid: number; timestamp: string; slots?: { main?: { content?: string } } }[] }[] }>>(
+    action(lang, { action: 'query', prop: 'revisions', titles: title, rvprop: 'ids|timestamp|content', rvslots: 'main', rvlimit: '1' }))
+  const r = d?.query?.pages?.[0]?.revisions?.[0]
+  return r ? { revid: r.revid, fecha: r.timestamp.slice(0, 16).replace('T', ' '), texto: r.slots?.main?.content ?? '' } : null
+}
+
 async function diff(lang: string, r: R.Rev): Promise<[string[], string[]] | null> {
   if (!r.parentid) return null
   try {
@@ -109,6 +117,11 @@ export async function analyzeArticle(lang: string, query: string, start: string,
   progress('Descargando protecciones y visitas…')
   const chartStart = R.addDays(start, -30)
   const [log, vw] = await Promise.all([protectionLog(lang, title, histStart, endExcl), views(lang, title, chartStart, end)])
+  const sizes = R.sizesOf(revs)
+  const described = days.map((d) => R.describeDay(d, byDay.get(d)!, diffs, lang, sizes))
+  const cur = described.some((d) => d.entraba.length || d.salia.length) ? await currentVersion(lang, title) : null
+  if (cur) for (const d of described) R.markCurrent(d, cur.texto)
+  const serie = R.series(revs, vw, chartStart, end)
   return {
     id: `live:${lang}:${title}`,
     titulo: title,
@@ -119,10 +132,56 @@ export async function analyzeArticle(lang: string, query: string, start: string,
     ...s,
     historial_completo: complete,
     resumen: summary(s, start, end, s.creado),
-    dias_disputa: days.map((d) => R.describeDay(d, byDay.get(d)!, diffs, lang)),
+    dias_disputa: described,
+    version_actual: cur ? { revid: cur.revid, fecha: cur.fecha } : null,
+    pico: R.peakVsDispute(serie, start, end),
     protecciones: R.protectionsIn(log, histStart),
-    serie: R.series(revs, vw, chartStart, end),
+    serie,
     periodo: { inicio: start, fin: end },
     cortado: !complete,
   }
+}
+
+// ---------------- visor de modificaciones (dentro del sitio)
+
+export type Seg = { t: string; m: boolean }
+export type DiffRow = { tipo: 'linea'; texto: string } | { tipo: 'contexto'; texto: string } | { tipo: 'cambio'; antes: Seg[] | null; despues: Seg[] | null }
+
+/** Texto de una celda del diff en segmentos; `m` = marcado por Wikipedia como cambiado (<ins>/<del>). */
+function segments(cell: Element, whole: boolean): Seg[] {
+  const out: Seg[] = []
+  const walk = (n: Node, marked: boolean) => {
+    if (n.nodeType === Node.TEXT_NODE) {
+      const t = n.textContent ?? ''
+      if (t) out.push({ t, m: whole || marked })
+      return
+    }
+    const el = n as Element
+    const mk = marked || ((el.tagName === 'INS' || el.tagName === 'DEL') && el.classList.contains('diffchange'))
+    n.childNodes.forEach((c) => walk(c, mk))
+  }
+  walk(cell, false)
+  return out
+}
+
+/** Diff entre dos revisiones, convertido a filas propias: solo texto, nunca HTML de Wikipedia en la página. */
+export async function diffRows(lang: string, fromrev: number, torev: number): Promise<DiffRow[]> {
+  const d = await getJson<{ compare?: { body?: string } }>(action(lang, { action: 'compare', fromrev: String(fromrev), torev: String(torev), prop: 'diff' }))
+  const body = d?.compare?.body
+  if (body == null) throw new Error('Wikipedia no devolvió esta modificación (puede estar oculta).')
+  const doc = new DOMParser().parseFromString(`<table>${body}</table>`, 'text/html')
+  const rows: DiffRow[] = []
+  doc.querySelectorAll('tr').forEach((tr) => {
+    const lineno = tr.querySelector('td.diff-lineno')
+    if (lineno) { rows.push({ tipo: 'linea', texto: lineno.textContent ?? '' }); return }
+    const del = tr.querySelector('td.diff-deletedline'), add = tr.querySelector('td.diff-addedline')
+    if (del || add) {
+      const both = !!(del && add)
+      rows.push({ tipo: 'cambio', antes: del ? segments(del, !both) : null, despues: add ? segments(add, !both) : null })
+      return
+    }
+    const ctx = tr.querySelector('td.diff-context')
+    if (ctx) rows.push({ tipo: 'contexto', texto: ctx.textContent ?? '' })
+  })
+  return rows
 }

@@ -98,10 +98,14 @@ def test_web_rules_match_python(tmp_path):
     revs = history(base_reverted=3, week_reverted=12)
     revs += [rev(400 + i, f"2026-11-10T0{i}:15:00Z", reverted=True, user="10.0.0.1", anon=True, comment="/* Ficha */") for i in range(5)]
     revs.sort(key=lambda r: r["timestamp"])
+    for r in revs:
+        r["size"] = 1000 + 7 * (r["revid"] % 13)
+    actual = "El artículo dice: un  abogado\n chileno. Luego neonazi &   «más» y otras cosas " + "x" * 300
+    visitas = {"2026-11-06": 900, "2026-11-08": 5000, "2026-11-10": 5000}
     log = [{"timestamp": "2026-11-10T21:03:00Z", "action": "move_prot", "comment": "Persistent [[WP:Vandalism|vandalism]]",
             "params": {"description": "\u200e[edit=autoconfirmed]"}}]
     case = {"revs": revs, "inicio": WS.isoformat(), "fin": WE.isoformat(), "completo": True, "desde": HS.isoformat(),
-            "diffs": {str(100 + i): body for i in range(6)} | {"400": body}, "log": log}
+            "diffs": {str(100 + i): body for i in range(6)} | {"400": body}, "log": log, "actual": actual, "visitas": visitas}
     f = tmp_path / "caso.json"
     f.write_text(json.dumps(case, ensure_ascii=False), encoding="utf-8")
     out = subprocess.run([node, str(root / "tests/js/disputa_paridad.ts"), str(f)], capture_output=True, text=True,
@@ -114,6 +118,20 @@ def test_web_rules_match_python(tmp_path):
     py_days = D.disputed_days(revs, WS, WE, py_score["habitual_por_dia"], top=5)
     assert len(py_days) == 2 and js["days"] == py_days
     diffs = {int(k): D.parse_diff(v) for k, v in case["diffs"].items()}
-    py_desc = [D.describe_day(d, [r for r in revs if r["timestamp"].startswith(d)], diffs, "es") for d in py_days]
+    sizes = D.sizes_of(revs)
+    py_desc = [D.describe_day(d, [r for r in revs if r["timestamp"].startswith(d)], diffs, "es", sizes) for d in py_days]
+    for d in py_desc:
+        D.mark_current(d, actual)
     assert js["describe"] == json.loads(json.dumps(py_desc))
+    marks = {f["texto"]: f.get("hoy") for d in py_desc for f in d["entraba"] + d["salia"]}
+    assert marks == {"neonazi & «más»": True, "[[Categoría:Nueva]]": False, "abogado": None}  # «abogado» tiene 7 caracteres: no se marca
+    edits = [e for d in py_desc for e in d["enlaces"]]
+    by_id = {r["revid"]: r for r in revs}
+    for e in edits:  # bytes solo si la versión anterior está en el historial descargado
+        parent = by_id.get(e["parentid"])
+        assert e["bytes"] == (None if parent is None else by_id[e["revid"]]["size"] - parent["size"])
+    assert any(e["bytes"] is not None for e in edits)
     assert js["protecciones"] == D.protections_in(log, HS)
+    pico = D.peak_vs_dispute(D.series(revs, visitas, WS, WE), WS.isoformat(), WE.isoformat())
+    assert js["pico"] == pico and pico["visitas"]["dia"] == "2026-11-08" and pico["desfase"] == 0
+    assert "5.000 visitas" in pico["frase"] and "el mismo día del pico de lectura" in pico["frase"]

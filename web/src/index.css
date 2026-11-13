@@ -569,3 +569,29 @@ dialog.about::backdrop { transition: opacity 200ms ease; }
 .disp-ex-h { margin: 14px 0 4px; font: 10.5px var(--font-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
 .disp-live-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 8px; font: 10.5px var(--font-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
 .disp-live-head .link { text-transform: none; letter-spacing: 0; font: .85rem var(--font-sans); }
+
+/* Visor de modificaciones, qué quedó y enlace compartido */
+.disp-live-actions { display: inline-flex; gap: 16px; }
+.disp-now { font: .8rem var(--font-sans); }
+.disp-now.yes { color: var(--accent); }
+.disp-now.no { color: var(--muted); }
+.disp-ctx summary { cursor: pointer; color: var(--ink-2); font-size: .8rem; }
+.disp-ctx p { font: .8rem/1.5 var(--font-mono); color: var(--ink-2); overflow-wrap: anywhere; margin: 4px 0; }
+.disp-edits { margin: 10px 0 4px; }
+.disp-edits ul { list-style: none; margin: 0; padding: 0; }
+.disp-edits li { border-top: 1px solid var(--line); }
+.disp-edit-btn { display: grid; gap: 2px; width: 100%; text-align: left; background: none; border: 0; padding: 7px 0; cursor: pointer; color: var(--ink); font: inherit; }
+.disp-edit-meta { font: 10.5px var(--font-mono); color: var(--muted); }
+.disp-edit-sum { font-size: .85rem; color: var(--ink-2); overflow-wrap: anywhere; }
+.disp-edits li.open .disp-edit-meta, .disp-edit-btn:focus-visible .disp-edit-meta { color: var(--accent); }
+.disp-diff { padding: 4px 0 10px 10px; border-left: 1px solid var(--accent-line); margin-bottom: 8px; }
+.disp-diff p { margin: 3px 0; }
+.dl-line { font: 10.5px var(--font-mono); color: var(--muted); }
+.dl-ctx { font: .8rem/1.5 var(--font-mono); color: var(--muted); overflow-wrap: anywhere; }
+.dl-del, .dl-add { font: .8rem/1.55 var(--font-mono); overflow-wrap: anywhere; white-space: pre-wrap; }
+.dl-del { color: var(--ink-2); }
+.dl-add { color: var(--ink); }
+.dl-sign { display: inline-block; width: 1.2em; color: var(--muted); }
+.dl-del del { background: rgba(236, 235, 243, 0.12); text-decoration: line-through; text-decoration-color: var(--ink-2); }
+.dl-add ins { background: rgba(242, 85, 154, 0.22); text-decoration: none; color: var(--ink); }
+@media (hover: hover) and (pointer: fine) { .disp-edit-btn:hover .disp-edit-sum { color: var(--ink); } }

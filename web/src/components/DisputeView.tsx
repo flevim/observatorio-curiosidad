@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { DisputeArticle, Disputes } from '../api'
+import type { DisputeArticle, DisputeEdit, Disputes, Fragment } from '../api'
 import { dateLabel, lang, num } from '../lib/format'
-import { analyzeArticle, MAX_DAYS, type LiveResult } from '../lib/disputeLive'
+import { analyzeArticle, diffRows, MAX_DAYS, type DiffRow, type LiveResult, type Seg } from '../lib/disputeLive'
 import { addDays } from '../lib/disputeRules'
 import { LANGS, searchWikipedia } from '../lib/wikipedia'
 
@@ -16,6 +16,25 @@ const EJEMPLOS = [
 ]
 const yesterday = () => addDays(new Date().toISOString().slice(0, 10), -1)
 
+type Initial = { lang: string; titulo: string; inicio: string | null; fin: string | null }
+/** Búsqueda guardada en el enlace: #vista=disputa&art=es:Título&desde=AAAA-MM-DD&hasta=AAAA-MM-DD */
+function readShared(): Initial | null {
+  const p = new URLSearchParams(location.hash.slice(1))
+  const art = p.get('art')
+  const i = art?.indexOf(':') ?? -1
+  if (!art || i < 1) return null
+  return { lang: art.slice(0, i), titulo: art.slice(i + 1), inicio: p.get('desde'), fin: p.get('hasta') }
+}
+function writeShared(r: LiveResult | null) {
+  const p = new URLSearchParams(location.hash.slice(1))
+  if (r) {
+    p.set('art', `${r.idioma}:${r.titulo}`); p.set('desde', r.periodo.inicio); p.set('hasta', r.periodo.fin)
+  } else {
+    p.delete('art'); p.delete('desde'); p.delete('hasta')
+  }
+  history.replaceState(null, '', `#${p}`)
+}
+
 const fmtDay = (iso: string) => dateLabel(iso.slice(0, 10))
 const veces = (a: DisputeArticle) =>
   a.nuevo ? 'artículo nuevo' : a.veces ? `${num(a.veces, 1)} × lo habitual` : 'antes: ninguna revertida'
@@ -27,7 +46,10 @@ export default function DisputeView({ data }: { data: Disputes }) {
   const items = useMemo(() => data.articulos.filter((a) => filter === 'todos' || a.idioma === filter), [data, filter])
   const ranked = items.filter((a) => !a.nuevo)
   const nuevos = items.filter((a) => a.nuevo)
-  const [live, setLive] = useState<LiveResult | null>(null)
+  const [live, setLiveState] = useState<LiveResult | null>(null)
+  const [copied, setCopied] = useState(false)
+  const initial = useMemo(readShared, [])
+  const setLive = (r: LiveResult | null) => { setLiveState(r); setCopied(false); writeShared(r) }
   const sel = items.find((a) => a.id === selId) ?? ranked[0] ?? nuevos[0] ?? null
   const langs = data.idiomas.filter((l) => data.articulos.some((a) => a.idioma === l))
 
@@ -54,7 +76,7 @@ export default function DisputeView({ data }: { data: Disputes }) {
         <p className="kicker"><span className="rule" aria-hidden="true" />Semana del {fmtDay(data.semana.inicio)} al {fmtDay(data.semana.fin)} · UTC</p>
         <h2 id="disp-title" className="prop-side-title">Bajo <em>disputa</em></h2>
         <p className="hero-lede">Artículos de Wikipedia con muchas más ediciones revertidas de lo habitual. Todo sale de datos públicos y cada número enlaza a su fuente.</p>
-        <LiveSearch onResult={(r) => { setLive(r); toDetail() }} />
+        <LiveSearch initial={initial} onResult={(r) => { setLive(r); toDetail() }} />
         <h3 className="disp-sub">Ranking de la semana</h3>
         <div className="seg disp-langs" role="group" aria-label="Idioma">
           {['todos', ...langs].map((l) => (
@@ -91,7 +113,12 @@ export default function DisputeView({ data }: { data: Disputes }) {
           <>
             <p className="disp-live-head">
               <span>Tu búsqueda · calculado en vivo con datos de Wikipedia</span>
-              <button className="link" onClick={() => setLive(null)}>Volver al ranking</button>
+              <span className="disp-live-actions">
+                <button className="link" onClick={() => navigator.clipboard?.writeText(location.href).then(() => setCopied(true), () => {})}>
+                  {copied ? 'Enlace copiado' : 'Copiar enlace'}
+                </button>
+                <button className="link" onClick={() => setLive(null)}>Volver al ranking</button>
+              </span>
             </p>
             {live.cortado && <p className="muted small">El artículo tiene tantas ediciones que el historial se cortó en las 20.000 más recientes: lo habitual se calcula con lo descargado.</p>}
             <Detail a={live} semana={live.periodo} protLabel="Protecciones en el período y los 90 días anteriores" />
@@ -102,9 +129,9 @@ export default function DisputeView({ data }: { data: Disputes }) {
   )
 }
 
-function LiveSearch({ onResult }: { onResult: (r: LiveResult) => void }) {
-  const [lng, setLng] = useState('es')
-  const [q, setQ] = useState('')
+function LiveSearch({ onResult, initial }: { onResult: (r: LiveResult) => void; initial: Initial | null }) {
+  const [lng, setLng] = useState(initial?.lang ?? 'es')
+  const [q, setQ] = useState(initial?.titulo ?? '')
   const [hits, setHits] = useState<string[]>([])
   const [mode, setMode] = useState<'90' | 'fechas'>('90')
   const [start, setStart] = useState(addDays(yesterday(), -89))
@@ -112,6 +139,7 @@ function LiveSearch({ onResult }: { onResult: (r: LiveResult) => void }) {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const typed = useRef(false)
+  const ranInitial = useRef(false)
 
   useEffect(() => {
     if (!typed.current || q.trim().length < 2) { setHits([]); return }
@@ -135,6 +163,17 @@ function LiveSearch({ onResult }: { onResult: (r: LiveResult) => void }) {
       setBusy(null)
     }
   }
+
+  // Enlace compartido: se repite la búsqueda guardada en la URL al abrir la página.
+  useEffect(() => {
+    if (!initial || ranInitial.current) return
+    ranInitial.current = true
+    const okDate = (d: string | null) => !!d && /^\d{4}-\d{2}-\d{2}$/.test(d)
+    if (okDate(initial.inicio) && okDate(initial.fin)) {
+      setMode('fechas'); setStart(initial.inicio!); setEnd(initial.fin!)
+      run(initial.titulo, initial.lang, initial.inicio!, initial.fin!)
+    } else run(initial.titulo, initial.lang)
+  })
 
   return (
     <form className="disp-search" onSubmit={(e) => { e.preventDefault(); run(q) }} aria-label="Revisar un artículo">
@@ -189,6 +228,7 @@ function Detail({ a, semana, protLabel = 'Protecciones en los últimos 90 días'
       <p className="eyebrow">{lang(a.idioma)} · {a.idioma}.wikipedia</p>
       <h2 className="disp-title"><a href={a.enlace} target="_blank" rel="noreferrer">{a.titulo} ↗</a></h2>
       <p className="disp-summary">{a.resumen}</p>
+      {a.pico && <p className="disp-summary">{a.pico.frase}</p>}
       <p className="disp-links">
         <a href={a.historial} target="_blank" rel="noreferrer">Historial completo ↗</a>
         <a href={a.registro_protecciones} target="_blank" rel="noreferrer">Registro de protecciones ↗</a>
@@ -222,18 +262,14 @@ function Detail({ a, semana, protLabel = 'Protecciones en los últimos 90 días'
             <div className="disp-frags">
               {d.entraba.length > 0 && <Frags title="Entraba" items={d.entraba} />}
               {d.salia.length > 0 && <Frags title="Salía" items={d.salia} />}
-              <p className="muted small">Texto tal cual, del diff de {d.diffs_revisados} de {d.revertidas} ediciones revertidas ese día.</p>
+              <p className="muted small">Texto tal cual, del diff de {d.diffs_revisados} de {d.revertidas} ediciones revertidas ese día.
+                {a.version_actual ? ` «Hoy» = versión actual del artículo (${a.version_actual.fecha} UTC).` : ''}</p>
             </div>
           )}
           {d.diffs_revisados === 0 && d.revertidas > 0 && (
             <p className="muted small">El texto de este día no se revisó: solo se leen los diffs de los 2 días con más revertidas de cada artículo. Las ediciones están enlazadas abajo.</p>
           )}
-          {d.enlaces.length > 0 && (
-            <details className="disp-diffs">
-              <summary>Ver las ediciones revertidas ({d.enlaces.length}{d.revertidas > d.enlaces.length ? ` de ${d.revertidas}` : ''})</summary>
-              <p>{d.enlaces.map((e) => <a key={e.url} href={e.url} target="_blank" rel="noreferrer">{e.hora} UTC</a>)}</p>
-            </details>
-          )}
+          {d.enlaces.length > 0 && <EditList lang={a.idioma} edits={d.enlaces} total={d.revertidas} />}
         </section>
       ))}
       </div>
@@ -241,12 +277,83 @@ function Detail({ a, semana, protLabel = 'Protecciones en los últimos 90 días'
   )
 }
 
-function Frags({ title, items }: { title: string; items: { texto: string; veces: number }[] }) {
+// ---------------- visor de modificaciones
+
+const sign = (b: number) => (b > 0 ? `+${num(b)}` : b < 0 ? `−${num(-b)}` : '0')
+
+/** Recorta el texto sin cambios de una línea larga, conservando los trozos marcados completos. */
+function compact(segs: Seg[]): Seg[] {
+  if (!segs.some((s) => s.m) || segs.every((s) => s.m)) {
+    const t = segs.map((s) => s.t).join('')
+    return t.length > 1500 ? [{ t: t.slice(0, 1500) + '…', m: segs[0]?.m ?? false }] : segs
+  }
+  return segs.map((s, i) => {
+    if (s.m || s.t.length <= 200) return s
+    if (i === 0) return { t: '…' + s.t.slice(-100), m: false }
+    if (i === segs.length - 1) return { t: s.t.slice(0, 100) + '…', m: false }
+    return { t: s.t.slice(0, 80) + ' … ' + s.t.slice(-80), m: false }
+  })
+}
+
+function EditItem({ lang: lng, e }: { lang: string; e: DisputeEdit }) {
+  const [open, setOpen] = useState(false)
+  const [rows, setRows] = useState<DiffRow[] | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const toggle = () => {
+    const next = !open
+    setOpen(next)
+    if (next && !rows && !err) {
+      if (!e.parentid) { setErr('Es la primera versión del artículo: no hay versión anterior con qué comparar.'); return }
+      diffRows(lng, e.parentid, e.revid).then(setRows, (x) => setErr(x instanceof Error ? x.message : 'No se pudo cargar la modificación.'))
+    }
+  }
+  return (
+    <li className={open ? 'open' : ''}>
+      <button className="disp-edit-btn" aria-expanded={open} onClick={toggle}>
+        <span className="disp-edit-meta">{e.hora} UTC · {e.sin_cuenta ? 'sin cuenta' : 'con cuenta'}{e.bytes !== null ? ` · ${sign(e.bytes)} bytes` : ''}</span>
+        <span className="disp-edit-sum">{e.comentario ? `«${e.comentario}»` : 'sin resumen de edición'}</span>
+      </button>
+      {open && (
+        <div className="disp-diff">
+          {err && <p className="disp-error">{err}</p>}
+          {!err && !rows && <p className="muted small" role="status">Cargando la modificación…</p>}
+          {rows && rows.length === 0 && <p className="muted small">Esta edición no cambió el texto (por ejemplo, solo movió algo de lugar).</p>}
+          {rows?.map((r, i) => r.tipo === 'linea' ? <p key={i} className="dl-line">{r.texto}</p>
+            : r.tipo === 'contexto' ? (r.texto.trim() ? <p key={i} className="dl-ctx">{r.texto.length > 220 ? r.texto.slice(0, 220) + '…' : r.texto}</p> : null)
+            : (
+              <div key={i}>
+                {r.antes && <p className="dl-del"><span className="dl-sign" aria-label="se quitó">−</span>{compact(r.antes).map((s, j) => s.m ? <del key={j}>{s.t}</del> : <span key={j}>{s.t}</span>)}</p>}
+                {r.despues && <p className="dl-add"><span className="dl-sign" aria-label="se agregó">+</span>{compact(r.despues).map((s, j) => s.m ? <ins key={j}>{s.t}</ins> : <span key={j}>{s.t}</span>)}</p>}
+              </div>
+            ))}
+          <p className="muted small">Diff de Wikipedia mostrado como texto (código fuente del artículo). <a href={e.url} target="_blank" rel="noreferrer">Verlo en Wikipedia ↗</a></p>
+        </div>
+      )}
+    </li>
+  )
+}
+
+function EditList({ lang: lng, edits, total }: { lang: string; edits: DisputeEdit[]; total: number }) {
+  return (
+    <div className="disp-edits">
+      <p className="disp-frag-h">Ediciones revertidas ese día ({edits.length}{total > edits.length ? ` de ${total}` : ''}) · toca una para ver qué cambió</p>
+      <ul>{edits.map((e) => <EditItem key={e.revid} lang={lng} e={e} />)}</ul>
+    </div>
+  )
+}
+
+function Frags({ title, items }: { title: string; items: Fragment[] }) {
   return (
     <div>
       <p className="disp-frag-h">{title}</p>
       <ul className="disp-frag-list">
-        {items.map((f) => <li key={f.texto}><code>{f.texto}</code>{f.veces > 1 && <span className="muted"> × {f.veces}</span>}</li>)}
+        {items.map((f) => (
+          <li key={f.texto}>
+            <code>{f.texto}</code>{f.veces > 1 && <span className="muted"> × {f.veces}</span>}
+            {f.hoy !== undefined && <span className={f.hoy ? 'disp-now yes' : 'disp-now no'}> · {f.hoy ? 'hoy está en el artículo' : 'hoy no está en el artículo'}</span>}
+            {f.hoy && f.contexto && <details className="disp-ctx"><summary>dónde está</summary><p>{f.contexto}</p></details>}
+          </li>
+        ))}
       </ul>
     </div>
   )

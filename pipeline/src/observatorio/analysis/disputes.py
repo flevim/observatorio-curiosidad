@@ -157,7 +157,22 @@ def _span(minutes: int) -> str:
     return f"{h:.0f} h" if h >= 3 else f"{h:.1f} h".replace(".", ",")
 
 
-def describe_day(day: str, revs_day: list[dict], diffs: dict[int, tuple[list[str], list[str]]], lang: str) -> dict:
+def edit_entry(r: dict, lang: str, sizes: dict[int, int]) -> dict:
+    """Una edición revertida, con lo necesario para verla dentro del sitio (el diff se pide aparte por revid)."""
+    parent = sizes.get(r.get("parentid") or 0)
+    return {
+        "hora": r["timestamp"][11:16],
+        "url": diff_url(lang, r),
+        "revid": r["revid"],
+        "parentid": r.get("parentid") or 0,
+        "comentario": r.get("comment") or "",
+        "sin_cuenta": is_anonymous(r),
+        "bytes": None if parent is None or r.get("size") is None else r["size"] - parent,
+    }
+
+
+def describe_day(day: str, revs_day: list[dict], diffs: dict[int, tuple[list[str], list[str]]], lang: str,
+                 sizes: dict[int, int] | None = None) -> dict:
     reverted = [r for r in revs_day if is_reverted(r)]
     times = sorted(datetime.fromisoformat(r["timestamp"].replace("Z", "+00:00")) for r in reverted)
     span = int((times[-1] - times[0]).total_seconds() // 60) if len(times) > 1 else 0
@@ -193,7 +208,64 @@ def describe_day(day: str, revs_day: list[dict], diffs: dict[int, tuple[list[str
         "salia": sal,
         "diffs_revisados": revisadas,
         "frases": frases,
-        "enlaces": [{"hora": r["timestamp"][11:16], "url": diff_url(lang, r)} for r in reverted[:20]],
+        "enlaces": [edit_entry(r, lang, sizes or {}) for r in reverted[:20]],
+    }
+
+
+def sizes_of(revs: list[dict]) -> dict[int, int]:
+    return {r["revid"]: r["size"] for r in revs if r.get("size") is not None}
+
+
+# ---------------- ¿qué quedó al final?
+
+def _norm(s: str) -> str:
+    return re.sub(r"\s+", " ", s or "").strip()
+
+
+MIN_CURRENT = 8
+
+
+def mark_current(day: dict, wikitext: str) -> None:
+    """Marca cada fragmento disputado con si está hoy en el texto del artículo y, si está, su contexto."""
+    text = _norm(wikitext)
+    for f in day["entraba"] + day["salia"]:
+        key = f["texto"][:-1] if f["texto"].endswith("…") else f["texto"]
+        if len(key) < MIN_CURRENT:  # «ref» o «<center>» aparecen en cualquier artículo: no dicen nada
+            continue
+        i = text.find(key)
+        f["hoy"] = i >= 0
+        if i >= 0:
+            a, b = max(0, i - 90), min(len(text), i + len(key) + 90)
+            f["contexto"] = ("…" if a else "") + text[a:b] + ("…" if b < len(text) else "")
+
+
+# ---------------- ¿la disputa vino antes o después del pico de lectura?
+
+MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+
+
+def fecha(iso: str) -> str:
+    y, m, d = iso.split("-")
+    return f"{int(d)} de {MESES[int(m) - 1]} de {y}"
+
+
+def peak_vs_dispute(serie: list[list], start: str, end: str) -> dict | None:
+    """Día con más visitas y día con más ediciones revertidas dentro del período (empates: el primero)."""
+    days = [s for s in serie if start <= s[0] <= end]
+    with_views = [s for s in days if s[3] is not None]
+    if not with_views or not any(s[2] for s in days):
+        return None
+    pv = max(with_views, key=lambda s: s[3])
+    pr = max(days, key=lambda s: s[2])
+    gap = (date.fromisoformat(pr[0]) - date.fromisoformat(pv[0])).days
+    rel = ("el mismo día del pico de lectura" if gap == 0 else
+           f"{abs(gap)} {'día' if abs(gap) == 1 else 'días'} {'después' if gap > 0 else 'antes'} del pico de lectura")
+    return {
+        "visitas": {"dia": pv[0], "n": pv[3]},
+        "revertidas": {"dia": pr[0], "n": pr[2]},
+        "desfase": gap,
+        "frase": (f"El día con más visitas del período fue el {fecha(pv[0])} ({f'{pv[3]:,}'.replace(',', '.')} visitas). "
+                  f"El día con más ediciones revertidas fue el {fecha(pr[0])} ({pr[2]}): {rel}."),
     }
 
 

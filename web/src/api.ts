@@ -163,17 +163,20 @@ export type PropArticle = {
 }
 export type Propagation = { dias: string[]; articulos: PropArticle[] }
 
-export type Fragment = { texto: string; veces: number }
+export type Fragment = { texto: string; veces: number; hoy?: boolean; contexto?: string }
+export type DisputeEdit = { hora: string; url: string; revid: number; parentid: number; comentario: string; sin_cuenta: boolean; bytes: number | null }
 export type DisputeDay = {
   dia: string; ediciones: number; revertidas: number; reversiones: number; minutos: number; editores: number; sin_cuenta: number
   secciones: { seccion: string; ediciones: number }[]; entraba: Fragment[]; salia: Fragment[]; diffs_revisados: number
-  frases: string[]; enlaces: { hora: string; url: string }[]
+  frases: string[]; enlaces: DisputeEdit[]
 }
 export type DisputeArticle = {
   id: string; titulo: string; idioma: string; enlace: string; historial: string; registro_protecciones: string
   revertidas_semana: number; ediciones_semana: number; habitual_por_dia: number | null; dias_comparados: number
   esperadas_semana: number; veces: number | null; puntaje: number; creado: string | null; nuevo: boolean
   historial_completo: boolean; resumen: string; dias_disputa: DisputeDay[]
+  version_actual?: { revid: number; fecha: string } | null
+  pico?: { visitas: { dia: string; n: number }; revertidas: { dia: string; n: number }; desfase: number; frase: string } | null
   protecciones: { fecha: string; accion: string; nivel: string; motivo: string }[]
   serie: [string, number, number, number | null][]
 }

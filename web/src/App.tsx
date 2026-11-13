@@ -180,6 +180,11 @@ export default function App() {
     if (period) p.set('periodo', period.id)
     if (selected) p.set('pais', selected)
     if (view !== 'globo') p.set('vista', view)
+    // La búsqueda de «Bajo disputa» guarda su artículo y fechas en la URL (ver DisputeView): se conservan.
+    if (view === 'disputa') {
+      const prev = new URLSearchParams(location.hash.slice(1))
+      for (const k of ['art', 'desde', 'hasta']) { const v = prev.get(k); if (v) p.set(k, v) }
+    }
     history.replaceState(null, '', `#${p}`)
   }, [topic, period, selected, view])
 
