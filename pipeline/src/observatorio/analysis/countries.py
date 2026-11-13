@@ -11,12 +11,12 @@ from __future__ import annotations
 
 import pandas as pd
 
-from ..sources.wikipedia import is_article, iter_topic_titles
+from ..sources.wikipedia import article_mask, iter_topic_titles
 
 
 def _prepare(tops: pd.DataFrame) -> pd.DataFrame:
     df = tops.copy()
-    df["is_article"] = df["article"].map(is_article)  # siempre con la regla vigente
+    df["is_article"] = article_mask(df["article"])  # siempre con la regla vigente
     df["month"] = df["date"].dt.to_period("M").dt.to_timestamp()
     return df
 

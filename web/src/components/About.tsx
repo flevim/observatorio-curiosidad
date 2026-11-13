@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, reportUrl, STATIC, type Finding, type Meta } from '../api'
 import { lang, pct } from '../lib/format'
+import type { TopicJob } from './TopicJobs'
 
-type Props = { meta: Meta; onClose: () => void; onTopicAdded: (id: string) => void }
+type Props = { meta: Meta; onClose: () => void; onQueued: (job: TopicJob) => void }
 
 /** Diálogo "Acerca de los datos": fuentes, limitaciones en lenguaje simple, hallazgos y agregar temas. */
-export default function About({ meta, onClose, onTopicAdded }: Props) {
+export default function About({ meta, onClose, onQueued }: Props) {
   const ref = useRef<HTMLDialogElement>(null)
   const [findings, setFindings] = useState<Finding[]>([])
   const onCloseRef = useRef(onClose)
@@ -79,19 +80,21 @@ export default function About({ meta, onClose, onTopicAdded }: Props) {
             config/topics.yaml en el repositorio o usa la versión local con la API.
           </p>
         ) : (
-          <AddTopic onAdded={onTopicAdded} />
+          <AddTopic onQueued={onQueued} />
         )}
       </div>
     </dialog>
   )
 }
 
-function AddTopic({ onAdded }: { onAdded: (id: string) => void }) {
+function AddTopic({ onQueued }: { onQueued: (job: TopicJob) => void }) {
   const [nombre, setNombre] = useState('')
   const [titulo, setTitulo] = useState('')
   const [idioma, setIdioma] = useState('es')
   const [status, setStatus] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [queued, setQueued] = useState<number | null>(null)
+  const [perm, setPerm] = useState(() => ('Notification' in window ? Notification.permission : 'denied'))
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -99,22 +102,12 @@ function AddTopic({ onAdded }: { onAdded: (id: string) => void }) {
     setStatus('Enviando…')
     try {
       const wikidata = /^Q\d+$/.test(titulo.trim()) ? titulo.trim() : undefined
-      const { job, tema } = await api.addTopic({ nombre, titulo: wikidata ? undefined : titulo, idioma, wikidata })
-      for (;;) {
-        await new Promise((r) => setTimeout(r, 2000))
-        const j = await api.job(job)
-        setStatus(`${j.estado}${j.log.length ? ': ' + j.log[j.log.length - 1] : ''}`)
-        if (j.estado === 'listo') {
-          setStatus(`Listo. ${j.avisos.length ? 'Avisos: ' + j.avisos.join(' | ') : ''}`)
-          api.clear()
-          onAdded(tema)
-          break
-        }
-        if (j.estado === 'error') {
-          setStatus(`Error: ${j.error}`)
-          break
-        }
-      }
+      const { job, tema, estimado } = await api.addTopic({ nombre, titulo: wikidata ? undefined : titulo, idioma, wikidata })
+      onQueued({ job, tema, nombre: nombre.trim(), estado: 'en cola', transcurrido: 0, estimado, delante: 0 })
+      setQueued(Math.max(1, Math.round(estimado / 60)))
+      setStatus(null)
+      setNombre('')
+      setTitulo('')
     } catch (err) {
       setStatus(String((err as Error).message))
     } finally {
@@ -138,6 +131,19 @@ function AddTopic({ onAdded }: { onAdded: (id: string) => void }) {
       </label>
       <button type="submit" disabled={busy}>Agregar</button>
       {status && <p role="status" className="muted small">{status}</p>}
+      {queued !== null && (
+        <div className="addtopic-ok" role="status">
+          <p>Recibido. Suele tardar unos {queued} {queued === 1 ? 'minuto' : 'minutos'}: se descargan sus visitas desde 2015 en 10 idiomas,
+            se recalcula el análisis y se actualiza el sitio. Puedes cerrar esta ventana y seguir navegando: abajo a la derecha verás el avance
+            y un aviso cuando esté listo.</p>
+          {perm === 'default' && (
+            <button type="button" className="link" onClick={() => Notification.requestPermission().then(setPerm, () => {})}>
+              Avisarme también con una notificación del navegador
+            </button>
+          )}
+          {perm === 'granted' && <p className="muted small">Te llegará una notificación del navegador aunque estés en otra pestaña.</p>}
+        </div>
+      )}
     </form>
   )
 }

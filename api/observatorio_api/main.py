@@ -245,6 +245,35 @@ def slugify(name: str) -> str:
     return s[:60] or "tema"
 
 
+# Duración de los últimos temas agregados: con eso se estima cuánto falta para el siguiente.
+DURACION_POR_DEFECTO = 180  # segundos, hasta que haya casos reales (medido: ~1 min de descarga + 35 s de análisis + 1 min de exportación)
+_HISTORIAL = PATHS.processed / "jobs_duracion.json"
+
+
+def _durations() -> list[float]:
+    try:
+        return [float(x) for x in json.loads(_HISTORIAL.read_text(encoding="utf-8"))][-20:]
+    except (OSError, ValueError, TypeError):
+        return []
+
+
+def _estimate() -> int:
+    d = sorted(_durations())
+    return int(d[len(d) // 2]) if d else DURACION_POR_DEFECTO
+
+
+def _public(job: dict) -> dict:
+    """Estado de un tema en proceso, con tiempos para que la web muestre el avance y avise al terminar."""
+    now = time.time()
+    ahead = sum(1 for j in JOBS.values() if j["estado"] == "en cola" and j["creado"] < job["creado"])
+    running = any(j["estado"] in ("descargando", "analizando", "exportando") for j in JOBS.values() if j is not job)
+    out = {k: v for k, v in job.items() if k != "creado"}
+    out["transcurrido"] = int((job.get("fin") or now) - job["creado"])
+    out["estimado"] = _estimate() * (1 + ahead + (1 if job["estado"] == "en cola" and running else 0))
+    out["delante"] = ahead + (1 if job["estado"] == "en cola" and running else 0)
+    return out
+
+
 def _run_job(job_id: str, tid: str) -> None:
     from observatorio.analysis.run import analyze
     from observatorio.export import export
@@ -256,19 +285,31 @@ def _run_job(job_id: str, tid: str) -> None:
     def log(msg: str) -> None:
         job["log"].append(msg)
 
+    def stage(name: str) -> None:
+        job["estado"] = name
+        job["etapas"][name] = int(time.time() - job["creado"])
+
     try:
         with _job_lock:  # un pipeline a la vez
-            job["estado"] = "descargando"
+            t0 = time.time()
+            stage("descargando")
             report = fetch([tid], countries=False, progress=log)
             job["avisos"] = report.warnings
-            job["estado"] = "analizando"
+            stage("analizando")
             analyze(progress=log)
             build_report()
-            job["estado"] = "exportando"
+            stage("exportando")
             export(progress=log)
+            took = time.time() - t0
         _read_cached.cache_clear()
-        job["estado"] = "listo"
+        job["fin"] = time.time()
+        stage("listo")
+        try:
+            _HISTORIAL.write_text(json.dumps([*_durations(), round(took)][-20:]), encoding="utf-8")
+        except OSError:
+            pass
     except BaseException as exc:  # noqa: BLE001 - se informa al usuario
+        job["fin"] = time.time()
         job["estado"] = "error"
         job["error"] = str(exc)
 
@@ -317,16 +358,17 @@ def add_topic(body: NewTopic, request: Request):
     append_topic(TopicConfig(id=tid, nombre=body.nombre.strip(), seed_lang=body.idioma if body.titulo else None,
                              seed_title=body.titulo, wikidata=body.wikidata))
     job_id = uuid.uuid4().hex[:12]
-    JOBS[job_id] = {"id": job_id, "tema": tid, "estado": "en cola", "log": [], "avisos": [], "error": None}
+    JOBS[job_id] = {"id": job_id, "tema": tid, "nombre": body.nombre.strip(), "estado": "en cola", "log": [], "avisos": [],
+                     "error": None, "creado": time.time(), "fin": None, "etapas": {}}
     threading.Thread(target=_run_job, args=(job_id, tid), daemon=True).start()
-    return {"job": job_id, "tema": tid}
+    return {"job": job_id, "tema": tid, "estimado": _public(JOBS[job_id])["estimado"]}
 
 
 @app.get("/api/jobs/{job_id}")
 def job(job_id: str):
     if job_id not in JOBS:
-        raise HTTPException(404)
-    return JOBS[job_id]
+        raise HTTPException(404, "Ese proceso ya no existe (el servidor se reinició).")
+    return _public(JOBS[job_id])
 
 
 @app.get("/api/health")

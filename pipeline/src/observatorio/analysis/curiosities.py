@@ -10,7 +10,7 @@ from urllib.parse import quote
 
 import pandas as pd
 
-from ..sources.wikipedia import is_article, iter_topic_titles
+from ..sources.wikipedia import article_mask, iter_topic_titles
 from .findings import MESES, num, pct
 
 EDICIONES = {
@@ -40,7 +40,7 @@ def fecha_corta(d: pd.Timestamp) -> str:
 
 def _articles(tops: pd.DataFrame) -> pd.DataFrame:
     # Se recalcula siempre: la lista de portadas/páginas de servicio puede mejorar después de descargar.
-    return tops[tops["article"].map(is_article)]
+    return tops[article_mask(tops["article"])]
 
 
 def _topic_map(resolved: dict) -> dict[tuple[str, str], str]:

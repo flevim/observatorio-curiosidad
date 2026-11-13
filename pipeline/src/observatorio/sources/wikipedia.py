@@ -14,6 +14,8 @@ Endpoints usados (https://doc.wikimedia.org/generated-data-platform/aqs/analytic
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 import json
 import logging
 import re
@@ -190,8 +192,17 @@ MAIN_PAGES = {
 }
 
 
+@lru_cache(maxsize=500_000)
 def is_article(article: str) -> bool:
-    return article not in MAIN_PAGES and not any(article == p or article.startswith(p) for p in NAMESPACE_PREFIXES)
+    # startswith con la tupla completa equivale a probar cada prefijo (y también la igualdad exacta).
+    return article not in MAIN_PAGES and not article.startswith(NAMESPACE_PREFIXES)
+
+
+def article_mask(articles: pd.Series) -> pd.Series:
+    """is_article para una columna entera, evaluando cada título distinto una sola vez
+    (los rankings por país repiten los mismos títulos millones de veces)."""
+    ok = {a: is_article(a) for a in articles.unique()}
+    return articles.map(ok).astype(bool)
 
 
 # ---------------------------------------------------------------- fuente
@@ -461,7 +472,7 @@ class WikipediaSource(DataSource):
         if not frames:
             return parse_top_per_country(None)
         out = pd.concat(frames, ignore_index=True)
-        out["is_article"] = out["article"].map(is_article)
+        out["is_article"] = article_mask(out["article"])
         return out
 
     # ---------------- relaciones semánticas

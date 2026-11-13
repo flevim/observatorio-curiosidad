@@ -595,3 +595,15 @@ dialog.about::backdrop { transition: opacity 200ms ease; }
 .dl-del del { background: rgba(236, 235, 243, 0.12); text-decoration: line-through; text-decoration-color: var(--ink-2); }
 .dl-add ins { background: rgba(242, 85, 154, 0.22); text-decoration: none; color: var(--ink); }
 @media (hover: hover) and (pointer: fine) { .disp-edit-btn:hover .disp-edit-sum { color: var(--ink); } }
+
+/* Aviso de temas en proceso (abajo a la derecha) */
+.jobs-notice { position: fixed; right: 22px; bottom: 76px; z-index: 40; width: min(380px, calc(100vw - 32px)); display: grid; gap: 8px; }
+.jobs-item { background: var(--panel-bg); border: 1px solid var(--line-2); padding: 10px 12px; font-size: .9rem; }
+.jobs-item p { margin: 0; }
+.jobs-item.ok { border-color: var(--accent-line); }
+.jobs-item.bad { border-color: var(--accent); }
+.jobs-actions { display: flex; gap: 16px; margin-top: 6px; }
+.jobs-actions:empty { display: none; }
+.addtopic-ok { margin-top: 10px; border-left: 2px solid var(--accent); padding-left: 10px; }
+.addtopic-ok p { margin: 0 0 6px; }
+@media (max-width: 767px) { .jobs-notice { right: 16px; bottom: 16px; } }

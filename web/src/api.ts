@@ -257,9 +257,12 @@ export const api = {
     const r = await fetch(`${API_BASE}/api/topics`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const data = await r.json()
     if (!r.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'No se pudo agregar el tema')
-    return data as { job: string; tema: string }
+    return data as { job: string; tema: string; estimado: number }
   },
-  job: (id: string) => get<{ estado: string; log: string[]; avisos: string[]; error: string | null; tema: string }>(`/api/jobs/${id}`, false),
+  job: (id: string) => get<{
+    estado: string; log: string[]; avisos: string[]; error: string | null; tema: string; nombre: string
+    transcurrido: number; estimado: number; delante: number
+  }>(`/api/jobs/${id}`, false),
   clear: () => cache.clear(),
 }
 

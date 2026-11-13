@@ -1,7 +1,8 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { geoCentroid } from 'd3-geo'
 import { api, type PropArticle, type Propagation, type Disputes, type CountryFeature, type GeoJSON, type GlobeData, type Graph, type Meta } from './api'
 import About from './components/About'
+import { TopicJobsNotice, useTopicJobs } from './components/TopicJobs'
 import CountryPanel from './components/CountryPanel'
 import CountryTable from './components/CountryTable'
 import FlatMap from './components/FlatMap'
@@ -22,6 +23,9 @@ const GlobeView = lazy(() => import('./components/GlobeView'))
 
 type View = 'globo' | 'mapa' | 'tabla' | 'propagacion' | 'disputa'
 type Panel = { kind: 'topic' } | { kind: 'country'; iso: string; name: string } | { kind: 'explore'; query: string } | null
+
+// Propagación y Bajo disputa ocupan toda la pantalla: al elegir un tema o un artículo se vuelve al globo.
+const leaveSpecialView = (v: View): View => (v === 'propagacion' || v === 'disputa' ? 'globo' : v)
 
 // Estado inicial leído una sola vez desde el enlace (#tema=…&periodo=…&pais=…&vista=…).
 function readHash() {
@@ -45,6 +49,7 @@ export default function App() {
   const [selected, setSelected] = useState<string | null>(initial.pais)
   const [view, setView] = useState<View>(initial.vista ?? 'globo')
   const [about, setAbout] = useState(false)
+  const topicJobs = useTopicJobs(() => { api.clear(); loadMetaRef.current() })
   const [sheet, setSheet] = useState<'peek' | 'full'>('peek')
   const [reduced, setReduced] = useState(prefersReducedMotion())
   // El globo gira al inicio; con «reducir movimiento» parte quieto, pero el botón permite activarlo.
@@ -54,10 +59,12 @@ export default function App() {
   const [volume, setVolume] = useState<GlobeData | null>(null)
   const [topicData, setTopicData] = useState<GlobeData | null>(null)
 
+  const loadMetaRef = useRef<() => void>(() => {})
   const loadMeta = useCallback(() => {
     api.meta().then(setMeta, (e) => setError(String(e.message ?? e)))
     api.graph().then(setGraph, () => {})
   }, [])
+  loadMetaRef.current = loadMeta
   useEffect(() => {
     loadMeta()
     api.geo('110m').then(setGeo, (e) => setError(String(e.message ?? e)))
@@ -192,6 +199,7 @@ export default function App() {
     (id: string, fromTrail = false) => {
       setTopic(id)
       setPanel({ kind: 'topic' })
+      setView(leaveSpecialView)
       setSheet('peek')
       setTrail((t) => {
         if (fromTrail) return t.slice(0, t.indexOf(id) + 1)
@@ -218,6 +226,7 @@ export default function App() {
 
   const explore = useCallback((query: string) => {
     setPanel({ kind: 'explore', query })
+    setView(leaveSpecialView)
     setSheet('peek')
     setPlaying(false)
   }, [])
@@ -423,7 +432,9 @@ export default function App() {
         </aside>
       )}
 
-      {about && <About meta={meta} onClose={() => setAbout(false)} onTopicAdded={(id) => { loadMeta(); goTopic(id) }} />}
+      {about && <About meta={meta} onClose={() => setAbout(false)} onQueued={topicJobs.add} />}
+      <TopicJobsNotice jobs={topicJobs.jobs} onDismiss={topicJobs.dismiss}
+        onOpen={(id) => { setAbout(false); goTopic(id) }} />
     </div>
   )
 }
