@@ -49,6 +49,10 @@ export default function App() {
   const [selected, setSelected] = useState<string | null>(initial.pais)
   const [view, setView] = useState<View>(initial.vista ?? 'globo')
   const [about, setAbout] = useState(false)
+  // Globo opcional: hay quien prefiere leer sin él. La preferencia se recuerda en este navegador.
+  const [noGlobe, setNoGlobe] = useState(() => { try { return localStorage.getItem('curiosity.sin-globo') === '1' } catch { return false } })
+  const [wide, setWide] = useState(false)
+  useEffect(() => { try { localStorage.setItem('curiosity.sin-globo', noGlobe ? '1' : '0') } catch { /* sin almacenamiento */ } }, [noGlobe])
   const topicJobs = useTopicJobs(() => { api.clear(); loadMetaRef.current() })
   const [sheet, setSheet] = useState<'peek' | 'full'>('peek')
   const [reduced, setReduced] = useState(prefersReducedMotion())
@@ -257,7 +261,7 @@ export default function App() {
     : 'Aún no se descargaron rankings por país.'
 
   return (
-    <div className={`app${hasPanel ? ' has-panel' : ''}${isHome ? ' home' : ''}${isProp ? ' prop-view' : ''}${isDisp ? ' disp-mode' : ''}`} data-reduced-motion={reduced}>
+    <div className={`app${hasPanel ? ' has-panel' : ''}${isHome ? ' home' : ''}${isProp ? ' prop-view' : ''}${noGlobe && view === 'globo' ? ' no-globe' : ''}${hasPanel && !isProp && (wide || (noGlobe && view === 'globo')) ? ' panel-wide' : ''}${isDisp ? ' disp-mode' : ''}`} data-reduced-motion={reduced}>
       <div className="frame" aria-hidden="true" />
       <a href="#main-panel" className="skip">Saltar al panel</a>
       <header className="topbar">
@@ -273,6 +277,10 @@ export default function App() {
         </div>
         <div className="top-right">
           {!isHome && <SearchBox topics={meta.temas} onPick={(id) => goTopic(id)} onExplore={explore} />}
+          <button className="ghost globe-toggle" aria-pressed={noGlobe} onClick={() => setNoGlobe(!noGlobe)}
+            title={noGlobe ? 'Volver a mostrar el globo' : 'Leer sin el globo: los paneles ocupan todo el ancho'}>
+            {noGlobe ? 'Mostrar globo' : 'Ocultar globo'}
+          </button>
           <span className="stamp">Datos al <b>{periodLabel(meta.curiosidades_dias?.[0] ?? meta.mes_final)}</b> · UTC</span>
           <div className="seg" role="group" aria-label="Vista">
             {(['globo', 'mapa', 'tabla', 'propagacion', 'disputa'] as View[]).map((v) => (
@@ -300,7 +308,7 @@ export default function App() {
       </nav>
 
       <main className="stage" aria-label="Mapa de atención">
-        {(view === 'globo' || isProp) && (
+        {((view === 'globo' && !noGlobe) || isProp) && (
           <Suspense fallback={<div className="loading">Cargando globo…</div>}>
             <GlobeView
               geo={geo}
@@ -333,7 +341,7 @@ export default function App() {
             <PropagationList items={propData.articulos.slice(0, 20)} selectedId={propArt?.id ?? null} onSelect={pickPropagation} dias={propData.dias.length} />
           ) : <p className="hint prop-empty">Aún no hay artículos que hayan pasado por varios países en los días recientes.</p>
         )}
-        {view === 'globo' && (
+        {view === 'globo' && !noGlobe && (
           <button className="rotate-toggle ghost" aria-pressed={rotate} onClick={() => setRotate(!rotate)}>
             {rotate ? 'Pausar giro' : 'Girar globo'}
           </button>
@@ -367,6 +375,11 @@ export default function App() {
 
       {hasPanel && (
         <aside id="main-panel" className={`panel sheet-${sheet}`} aria-labelledby="panel-title" tabIndex={-1}>
+          {!isProp && !(noGlobe && view === 'globo') && (
+            <button className="ghost panel-expand" aria-pressed={wide} onClick={() => setWide(!wide)}>
+              {wide ? 'Reducir panel' : 'Ampliar panel'}
+            </button>
+          )}
           <button
             className="sheet-handle"
             aria-label={sheet === 'peek' ? 'Expandir panel' : 'Contraer panel'}

@@ -607,3 +607,21 @@ dialog.about::backdrop { transition: opacity 200ms ease; }
 .addtopic-ok { margin-top: 10px; border-left: 2px solid var(--accent); padding-left: 10px; }
 .addtopic-ok p { margin: 0 0 6px; }
 @media (max-width: 767px) { .jobs-notice { right: 16px; bottom: 16px; } }
+
+/* Globo opcional y panel ampliado */
+.globe-toggle { height: 30px; }
+.panel-expand { display: block; margin: 12px 22px 0 auto; }
+.app.panel-wide.has-panel { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'top' 'banner' 'crumbs' 'panel' 'bottom'; }
+.app.panel-wide .stage { display: none; }
+.app.panel-wide .panel { border-left: 0; }
+.app.panel-wide .panel-body { max-width: 1100px; margin: 0 auto; }
+.app.no-globe .overlay-bottom { display: none; }
+.app.no-globe .hero { left: 0; right: 0; margin: 0 auto; width: min(760px, calc(100% - 44px)); }
+@media (max-width: 767px) {
+  .panel-expand { display: none; }
+  .app.panel-wide .panel { position: static; transform: none; height: auto; box-shadow: none; border-top: 0; }
+  .app.panel-wide .panel .panel-body { padding-bottom: 28px; }
+  .app.panel-wide .sheet-handle { display: none; }
+  .app.no-globe .hero { max-height: none; bottom: 14px; }
+  .app.panel-wide .bottombar { display: none; } /* la línea de tiempo mueve el globo: con el panel ampliado solo quita espacio */
+}
